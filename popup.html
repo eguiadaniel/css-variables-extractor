@@ -1,11 +1,14 @@
-<!-- popup.html -->
 <!DOCTYPE html>
 <html>
 <head>
   <title>Storybook CSS Variable Extractor</title>
   <style>
-    body { width: 300px; padding: 10px; }
+    body { width: 400px; padding: 10px; font-family: Arial, sans-serif; }
     button { margin: 5px 0; display: block; width: 100%; }
+    #variableList { margin-top: 20px; max-height: 400px; overflow-y: auto; }
+    .variable-row { margin-bottom: 10px; }
+    .variable-name { font-weight: bold; }
+    input[type="text"] { width: 200px; }
   </style>
 </head>
 <body>
@@ -13,7 +16,7 @@
   <button id="export">Export to JSON</button>
   <input type="file" id="importFile" accept=".json" style="display: none;">
   <button id="import">Import from JSON</button>
-  <button id="updateVariables">Update Variables</button>
+  <div id="variableList"></div>
   <script src="popup.js"></script>
 </body>
 </html>
