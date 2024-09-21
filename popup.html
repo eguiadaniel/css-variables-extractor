@@ -6,9 +6,10 @@
     body { width: 400px; padding: 10px; font-family: Arial, sans-serif; }
     button { margin: 5px 0; display: block; width: 100%; }
     #variableList { margin-top: 20px; max-height: 400px; overflow-y: auto; }
-    .variable-row { margin-bottom: 10px; }
-    .variable-name { font-weight: bold; }
-    input[type="text"] { width: 200px; }
+    .variable-row { margin-bottom: 10px; display: flex; align-items: center; }
+    .variable-name { font-weight: bold; margin-right: 10px; flex: 1; }
+    input[type="text"], input[type="color"] { width: 100px; }
+    input[type="color"] { height: 30px; padding: 0; border: none; }
   </style>
 </head>
 <body>

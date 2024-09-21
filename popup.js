@@ -30,26 +30,64 @@ function updateVariableList() {
   for (const [key, value] of Object.entries(currentVariables)) {
     const row = document.createElement('div');
     row.className = 'variable-row';
-    row.innerHTML = `
-      <span class="variable-name">${key}:</span>
-      <input type="text" value="${value}" data-var-name="${key}">
-    `;
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'variable-name';
+    nameSpan.textContent = key + ':';
+    row.appendChild(nameSpan);
+
+    if (isColorValue(value)) {
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = convertToHex(value);
+      colorInput.dataset.varName = key;
+      colorInput.addEventListener('input', handleColorChange);
+      row.appendChild(colorInput);
+    } else {
+      const textInput = document.createElement('input');
+      textInput.type = 'text';
+      textInput.value = value;
+      textInput.dataset.varName = key;
+      textInput.addEventListener('input', handleTextChange);
+      row.appendChild(textInput);
+    }
+
     variableList.appendChild(row);
   }
+}
 
-  // Add event listeners to inputs
-  const inputs = variableList.querySelectorAll('input');
-  inputs.forEach(input => {
-    input.addEventListener('input', function() {
-      const varName = this.dataset.varName;
-      const varValue = this.value;
-      currentVariables[varName] = varValue;
-      updateVariable(varName, varValue);
-    });
-  });
+function isColorValue(value) {
+  // Check if the value is a valid color (hex, rgb, rgba, hsl, hsla)
+  const colorRegex = /^(#[0-9A-Fa-f]{3,8}|(rgb|hsl)a?\(.*\))$/;
+  return colorRegex.test(value.trim());
+}
+
+function convertToHex(color) {
+  // Convert various color formats to hex
+  const div = document.createElement('div');
+  div.style.color = color;
+  document.body.appendChild(div);
+  const rgbColor = window.getComputedStyle(div).color;
+  document.body.removeChild(div);
+  
+  const rgb = rgbColor.match(/\d+/g);
+  return rgb ? "#" + rgb.map(x => parseInt(x).toString(16).padStart(2, '0')).join('') : color;
+}
+
+function handleColorChange(event) {
+  const varName = event.target.dataset.varName;
+  const varValue = event.target.value;
+  updateVariable(varName, varValue);
+}
+
+function handleTextChange(event) {
+  const varName = event.target.dataset.varName;
+  const varValue = event.target.value;
+  updateVariable(varName, varValue);
 }
 
 function updateVariable(name, value) {
+  currentVariables[name] = value;
   chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
     chrome.tabs.sendMessage(tabs[0].id, {
       action: "updateVariable",
