@@ -28,13 +28,24 @@ document.getElementById('importFile').addEventListener('change', (event) => {
   if (file) {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const cssVariables = JSON.parse(e.target.result);
-      chrome.storage.local.set({cssVariables}, () => {
-        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-          chrome.tabs.sendMessage(tabs[0].id, {action: "import", variables: cssVariables});
+      try {
+        const cssVariables = JSON.parse(e.target.result);
+        chrome.storage.local.set({cssVariables}, () => {
+          chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+            chrome.tabs.sendMessage(tabs[0].id, {action: "import", variables: cssVariables});
+          });
         });
-      });
+      } catch (error) {
+        console.error('Error parsing JSON:', error);
+        alert('Error importing CSS variables. Please check the file format.');
+      }
     };
     reader.readAsText(file);
   }
 });
+
+document.getElementById('updateVariables').addEventListener('click', () => {
+    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+      chrome.tabs.sendMessage(tabs[0].id, {action: "openVariableEditor"});
+    });
+  });
