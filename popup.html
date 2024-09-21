@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Storybook CSS Variable Extractor</title>
+  <style>
+    body { width: 300px; padding: 10px; }
+    button { margin: 5px 0; display: block; width: 100%; }
+  </style>
+</head>
+<body>
+  <button id="extract">Extract CSS Variables</button>
+  <button id="export">Export to JSON</button>
+  <input type="file" id="importFile" accept=".json" style="display: none;">
+  <button id="import">Import from JSON</button>
+  <script src="popup.js"></script>
+</body>
+</html>

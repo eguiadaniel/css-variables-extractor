@@ -1,0 +1,31 @@
+{
+    "manifest_version": 3,
+    "name": "Storybook CSS Variable Extractor",
+    "version": "1.0",
+    "description": "Extract CSS variables from Storybook and import/export them as JSON",
+    "permissions": [
+      "activeTab",
+      "storage",
+      "downloads"
+    ],
+    "host_permissions": [
+      "http://localhost:4400/*"
+    ],
+    "action": {
+      "default_popup": "popup.html"
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["content.js"],
+        "all_frames": true
+      }
+    ],
+     "icons": {
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  }
+  }
