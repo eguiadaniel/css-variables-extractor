@@ -1,4 +1,4 @@
-  {
+{
     "manifest_version": 3,
     "name": "Storybook CSS Variable Extractor",
     "version": "1.0",
@@ -6,7 +6,8 @@
     "permissions": [
       "activeTab",
       "storage",
-      "downloads"
+      "downloads",
+      "tabs"
     ],
     "host_permissions": [
       "<all_urls>"
@@ -26,9 +27,5 @@
     "web_accessible_resources": [{
       "resources": ["variableEditor.html"],
       "matches": ["<all_urls>"]
-    }],
-    "icons": {
-        "48": "images/icon48.png",
-        "128": "images/icon128.png"
-      }
+    }]
   }

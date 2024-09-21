@@ -31,9 +31,12 @@ function updateVariableList() {
       const varName = this.dataset.varName;
       const varValue = this.value;
       currentVariables[varName] = varValue;
-      chrome.runtime.sendMessage({
-        action: "updateVariable",
-        variable: { [varName]: varValue }
+      console.log('Sending update for variable:', varName, varValue);
+      chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: "updateVariable",
+          variable: { [varName]: varValue }
+        });
       });
     });
   });

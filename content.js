@@ -1,20 +1,27 @@
 // content.js
+let variableEditorWindow = null;
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "extract") {
-      extractAllRelevantCSSVariables()
-        .then(cssVariables => {
-          chrome.storage.local.set({cssVariables}, () => {
-            alert('CSS variables extracted successfully!');
-          });
-        })
-        .catch(error => {
-          console.error('Error extracting CSS variables:', error);
-          alert('Error extracting CSS variables. Check the console for details.');
+  console.log('Message received in content script:', request);
+  if (request.action === "extract") {
+    extractAllRelevantCSSVariables()
+      .then(cssVariables => {
+        chrome.storage.local.set({cssVariables}, () => {
+          alert('CSS variables extracted successfully!');
         });
-    } else if (request.action === "import") {
-      applyCSSVariablesToShowcasedComponent(request.variables);
-    }
-  });
+      })
+      .catch(error => {
+        console.error('Error extracting CSS variables:', error);
+        alert('Error extracting CSS variables. Check the console for details.');
+      });
+  } else if (request.action === "import") {
+    applyCSSVariablesToShowcasedComponent(request.variables);
+  } else if (request.action === "openVariableEditor") {
+    openVariableEditor();
+  } else if (request.action === "updateVariable") {
+    updateVariable(request.variable);
+  }
+});
   
   async function extractAllRelevantCSSVariables() {
     const iframe = document.getElementById('storybook-preview-iframe');
@@ -144,3 +151,58 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       alert('Error applying CSS variables. Check the console for details.');
     }
   }
+
+  
+  function openVariableEditor() {
+    console.log('Opening variable editor');
+    if (variableEditorWindow && !variableEditorWindow.closed) {
+      console.log('Focusing existing window');
+      variableEditorWindow.focus();
+    } else {
+      console.log('Creating new window');
+      variableEditorWindow = window.open(chrome.runtime.getURL('variableEditor.html'), 'variableEditor', 'width=400,height=600');
+      if (!variableEditorWindow) {
+        console.error('Failed to open variable editor window. Check if pop-ups are blocked.');
+        alert('Failed to open variable editor. Please check if pop-ups are blocked for this site.');
+        return;
+      }
+      variableEditorWindow.addEventListener('load', () => {
+        console.log('Variable editor window loaded');
+        extractAllRelevantCSSVariables().then(cssVariables => {
+          console.log('Extracted CSS variables:', cssVariables);
+          const allVariables = {...cssVariables.main, ...cssVariables.skin};
+          console.log('Sending variables to editor:', allVariables);
+          variableEditorWindow.postMessage({
+            action: "updateVariableList",
+            variables: allVariables
+          }, '*');
+        });
+      });
+    }
+  }
+  
+  function updateVariable(variable) {
+    console.log('Updating variable:', variable);
+    const iframe = document.getElementById('storybook-preview-iframe');
+    if (!iframe) {
+      console.error('Storybook iframe not found');
+      return;
+    }
+  
+    try {
+      const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+      const showcasedComponent = iframeDocument.querySelector('storybook-root > div > *');
+      if (!showcasedComponent) {
+        console.error('Showcased component not found');
+        return;
+      }
+  
+      for (const [key, value] of Object.entries(variable)) {
+        showcasedComponent.style.setProperty(key, value);
+      }
+    } catch (e) {
+      console.error('Error updating CSS variable:', e);
+    }
+  }
+  
+  console.log('Content script loaded');
