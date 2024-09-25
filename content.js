@@ -1,4 +1,3 @@
-// content.js
 let extractedData = {
   mainCss: { info: {}, variables: [] },
   defaultCss: { info: {}, variables: [] },
@@ -8,14 +7,16 @@ let extractedData = {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Message received in content script:', request);
   if (request.action === "extract") {
+    console.log('Starting extraction process');
     extractAllRelevantCSSVariables()
       .then(cssVariables => {
+        console.log('Extraction complete, sending response:', cssVariables);
         extractedData = cssVariables;
         sendResponse({variables: extractedData});
       })
       .catch(error => {
         console.error('Error extracting CSS variables:', error);
-        sendResponse({error: 'Error extracting CSS variables'});
+        sendResponse({error: 'Error extracting CSS variables', details: error.message});
       });
     return true; // Indicates we wish to send a response asynchronously
   } else if (request.action === "import") {
@@ -29,35 +30,81 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function extractAllRelevantCSSVariables() {
+async function extractAllRelevantCSSVariables(retryCount = 0, maxRetries = 5) {
+  console.log(`Starting variable extraction process (attempt ${retryCount + 1})`);
+  
   const iframe = document.getElementById('storybook-preview-iframe');
   if (!iframe) {
     console.error('Storybook iframe not found');
-    return {};
+    return { error: 'Storybook iframe not found' };
   }
+  console.log('Storybook iframe found');
 
   const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+  console.log('Accessed iframe document');
+
+  // Add a delay to ensure the component is rendered
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  const showcasedComponent = await findShowcasedComponent(iframeDocument);
+  if (!showcasedComponent) {
+    if (retryCount < maxRetries) {
+      console.log(`Retrying extraction in 2 seconds (attempt ${retryCount + 2})`);
+      return new Promise(resolve => {
+        setTimeout(() => {
+          resolve(extractAllRelevantCSSVariables(retryCount + 1, maxRetries));
+        }, 2000);
+      });
+    }
+    console.error('Showcased component not found after multiple attempts');
+    return { error: 'Showcased component not found after multiple attempts' };
+  }
+  console.log('Showcased component found:', showcasedComponent.tagName);
+
+  const relevantSelectors = getAllRelevantSelectors(showcasedComponent);
+  console.log('Relevant selectors:', relevantSelectors);
 
   const mainStylesheet = iframeDocument.querySelector('link[href*="main.css"]');
   const defaultStylesheet = iframeDocument.querySelector('link[href*="default.css"]');
 
   if (!mainStylesheet || !defaultStylesheet) {
     console.error('One or both stylesheets not found');
-    return {};
+    return { 
+      error: 'Stylesheets not found', 
+      mainStylesheet: mainStylesheet ? mainStylesheet.href : 'Not found',
+      defaultStylesheet: defaultStylesheet ? defaultStylesheet.href : 'Not found'
+    };
   }
+  console.log('Stylesheets found:', 
+    { main: mainStylesheet.href, default: defaultStylesheet.href });
 
-  const mainVariables = await extractCSSVariables(mainStylesheet.href, 'mainCss');
-  const defaultVariables = await extractCSSVariables(defaultStylesheet.href, 'defaultCss');
-  const currentStoryVariables = extractCurrentStoryVariables(iframeDocument);
+  try {
+    console.log('Extracting variables from main.css');
+    const mainVariables = await extractCSSVariables(mainStylesheet.href, 'mainCss', relevantSelectors);
+    console.log('Main variables extracted:', mainVariables);
 
-  return {
-    mainCss: mainVariables,
-    defaultCss: defaultVariables,
-    currentStory: currentStoryVariables
-  };
+    console.log('Extracting variables from default.css');
+    const defaultVariables = await extractCSSVariables(defaultStylesheet.href, 'defaultCss', relevantSelectors);
+    console.log('Default variables extracted:', defaultVariables);
+
+    console.log('Extracting current story variables');
+    const currentStoryVariables = extractCurrentStoryVariables(showcasedComponent);
+    console.log('Current story variables extracted:', currentStoryVariables);
+
+    const result = {
+      mainCss: mainVariables,
+      defaultCss: defaultVariables,
+      currentStory: currentStoryVariables
+    };
+    console.log('Final extracted data:', result);
+    return result;
+  } catch (error) {
+    console.error('Error during variable extraction:', error);
+    return { error: 'Error during variable extraction', details: error.message };
+  }
 }
 
-async function extractCSSVariables(stylesheetUrl, sourceKey) {
+async function extractCSSVariables(stylesheetUrl, sourceKey, selectors) {
   try {
     const response = await fetch(stylesheetUrl);
     if (!response.ok) {
@@ -68,7 +115,7 @@ async function extractCSSVariables(stylesheetUrl, sourceKey) {
       url: stylesheetUrl,
       size: cssText.length
     };
-    const variables = extractVariablesFromText(cssText, sourceKey, stylesheetUrl);
+    const variables = extractVariablesFromText(cssText, sourceKey, stylesheetUrl, selectors);
     return { info, variables };
   } catch (error) {
     console.error(`Error fetching stylesheet ${stylesheetUrl}:`, error);
@@ -76,7 +123,7 @@ async function extractCSSVariables(stylesheetUrl, sourceKey) {
   }
 }
 
-function extractVariablesFromText(cssText, sourceKey, origin) {
+function extractVariablesFromText(cssText, sourceKey, origin, selectors) {
   const variables = [];
   const parser = new DOMParser();
   const doc = parser.parseFromString('<style>' + cssText + '</style>', 'text/html');
@@ -86,7 +133,6 @@ function extractVariablesFromText(cssText, sourceKey, origin) {
   for (let i = 0; i < styleSheet.cssRules.length; i++) {
     const rule = styleSheet.cssRules[i];
     if (rule.type === CSSRule.STYLE_RULE) {
-      const selector = rule.selectorText;
       const styleText = rule.style.cssText;
       const variableRegex = /(--.+?):\s*(.+?);/g;
       let match;
@@ -96,7 +142,7 @@ function extractVariablesFromText(cssText, sourceKey, origin) {
         variables.push({
           id: `${sourceKey}-${varName.substring(2)}`,
           name: varName,
-          selector: selector,
+          selector: rule.selectorText,
           value: varValue,
           alias: varValue.startsWith('var(') ? varValue.match(/var\((.*?)\)/)[1] : null,
           origin: origin
@@ -105,70 +151,146 @@ function extractVariablesFromText(cssText, sourceKey, origin) {
     }
   }
 
+  console.log(`Extracted ${variables.length} variables from ${sourceKey}`);
   return variables;
 }
 
-function extractCurrentStoryVariables(iframeDocument) {
-  const showcasedComponent = findShowcasedComponent(iframeDocument);
-  if (!showcasedComponent) {
-    console.error('Showcased component not found');
-    return { info: {}, variables: [] };
-  }
+function extractCurrentStoryVariables(component) {
+  console.log('Extracting variables from current story component:', component);
 
   const info = {
-    componentName: showcasedComponent.tagName.toLowerCase(),
-    componentId: showcasedComponent.id || 'unknown'
+    componentName: component.tagName.toLowerCase(),
+    componentId: component.id || 'unknown',
+    componentClasses: Array.from(component.classList).join(' ')
   };
 
+  console.log('Component info:', info);
+
   const variables = [];
-  const computedStyle = window.getComputedStyle(showcasedComponent);
-  for (let i = 0; i < computedStyle.length; i++) {
-    const prop = computedStyle[i];
-    if (prop.startsWith('--')) {
-      const value = computedStyle.getPropertyValue(prop).trim();
-      variables.push({
-        id: `currentStory-${prop.substring(2)}`,
-        name: prop,
-        selector: showcasedComponent.tagName.toLowerCase(),
-        value: value,
-        alias: value.startsWith('var(') ? value.match(/var\((.*?)\)/)[1] : null,
-        origin: 'currentStory'
-      });
+
+  function extractFromElement(element, depth = 0) {
+    console.log(`Examining element at depth ${depth}:`, element);
+
+    const computedStyle = window.getComputedStyle(element);
+    let elementVariables = 0;
+
+    for (let i = 0; i < computedStyle.length; i++) {
+      const prop = computedStyle[i];
+      if (prop.startsWith('--')) {
+        const value = computedStyle.getPropertyValue(prop).trim();
+        variables.push({
+          id: `currentStory-${prop.substring(2)}`,
+          name: prop,
+          selector: getUniqueSelector(element),
+          value: value,
+          alias: value.startsWith('var(') ? value.match(/var\((.*?)\)/)[1] : null,
+          origin: 'currentStory'
+        });
+        elementVariables++;
+      }
+    }
+
+    console.log(`Found ${elementVariables} variables for element:`, element);
+
+    for (let child of element.children) {
+      extractFromElement(child, depth + 1);
     }
   }
 
+  function getUniqueSelector(element) {
+    if (element.id) {
+      return '#' + element.id;
+    }
+    let selector = element.tagName.toLowerCase();
+    if (element.className) {
+      selector += '.' + Array.from(element.classList).join('.');
+    }
+    if (element.parentElement) {
+      return getUniqueSelector(element.parentElement) + ' > ' + selector;
+    }
+    return selector;
+  }
+
+  extractFromElement(component);
+
+  console.log(`Total variables extracted from current story: ${variables.length}`);
   return { info, variables };
 }
 
-function findShowcasedComponent(doc) {
-  // Try different selectors to find the showcased component
+async function findShowcasedComponent(doc, retryCount = 0, maxRetries = 5) {
+  console.log(`Searching for showcased component (attempt ${retryCount + 1})`);
+  
   const selectors = [
-    '#storybook-root > storybook-root > *:not(storybook-root)',
-    '#storybook-root > *:not(storybook-root)',
-    '#storybook-root storybook-root > *:not(storybook-root)',
-    '#root > *',
-    '.sb-show-main > *'
+    '#storybook-root > *:not(script):not(style)',
+    '.sb-show-main > *:not(script):not(style)',
+    '[id^="story--"] > *:not(script):not(style)',
+    '.sb-show-main [id^="story--"] > *:not(script):not(style)',
+    '#storybook-preview-wrapper .innerZoomElementWrapper > *:not(script):not(style)'
   ];
 
   for (let selector of selectors) {
+    console.log(`Trying selector: ${selector}`);
     const elements = doc.querySelectorAll(selector);
+    console.log(`Found ${elements.length} elements with selector ${selector}`);
+    
     for (let element of elements) {
-      if (element.tagName.toLowerCase() !== 'storybook-root' && !element.tagName.toLowerCase().startsWith('ng-')) {
+      if (element.tagName.toLowerCase() !== 'div' && 
+          !element.tagName.toLowerCase().startsWith('storybook-') &&
+          !element.tagName.toLowerCase().startsWith('ng-')) {
+        console.log(`Showcased component found: <${element.tagName.toLowerCase()}>`, element);
         return element;
       }
     }
   }
 
-  // If no matching element found, return the first non-storybook-root child of #storybook-root
-  const rootChildren = doc.querySelectorAll('#storybook-root > *');
-  for (let child of rootChildren) {
-    if (child.tagName.toLowerCase() !== 'storybook-root') {
-      return child;
+  // Fallback: Look for any element with children
+  console.log('No suitable component found, trying fallback method');
+  const allElements = doc.querySelectorAll('#storybook-root *, .sb-show-main *');
+  for (let element of allElements) {
+    if (element.children.length > 0 && element.tagName.toLowerCase() !== 'script' && element.tagName.toLowerCase() !== 'style') {
+      console.log(`Fallback: potential showcased component found: <${element.tagName.toLowerCase()}>`, element);
+      return element;
     }
   }
 
-  console.error('Could not find showcased component');
+  if (retryCount < maxRetries) {
+    console.log(`Retrying in 2 seconds (attempt ${retryCount + 2})`);
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve(findShowcasedComponent(doc, retryCount + 1, maxRetries));
+      }, 2000);
+    });
+  }
+
+  console.error('Could not find showcased component after multiple attempts');
   return null;
+}
+
+console.log('Content script loaded');
+
+function getAllRelevantSelectors(element) {
+  const selectors = new Set();
+  
+  function addSelectorsForElement(el) {
+    selectors.add(el.tagName.toLowerCase());
+    el.classList.forEach(className => selectors.add('.' + className));
+    if (el.id) selectors.add('#' + el.id);
+    
+    // Add attribute selectors
+    for (let attr of el.attributes) {
+      if (attr.name !== 'class' && attr.name !== 'id') {
+        selectors.add(`[${attr.name}]`);
+      }
+    }
+
+    // Recursively process child elements
+    for (let child of el.children) {
+      addSelectorsForElement(child);
+    }
+  }
+
+  addSelectorsForElement(element);
+  return Array.from(selectors);
 }
 
 function importVariables(variables) {

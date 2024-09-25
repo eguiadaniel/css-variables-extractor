@@ -1,21 +1,28 @@
-// popup.js
 let currentVariables = {};
 
 document.addEventListener('DOMContentLoaded', function() {
-  loadAndDisplayVariables();
+  const extractButton = document.getElementById('extractButton');
+  const exportButton = document.getElementById('exportButton');
+  const importInput = document.getElementById('importInput');
+  const statusDiv = document.getElementById('status');
 
-  document.getElementById('extract').addEventListener('click', extractVariables);
-  document.getElementById('export').addEventListener('click', exportVariables);
-  document.getElementById('import').addEventListener('click', () => {
-    document.getElementById('importFile').click();
-  });
-  document.getElementById('importFile').addEventListener('change', importVariables);
+  extractButton.addEventListener('click', extractVariables);
+  exportButton.addEventListener('click', exportVariables);
+  importInput.addEventListener('change', importVariables);
 });
 
-function loadAndDisplayVariables() {
-  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, {action: "getVariables"}, (response) => {
-      if (response && response.variables) {
+function extractVariables() {
+  const statusDiv = document.getElementById('status');
+  statusDiv.textContent = 'Extracting variables...';
+  
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    chrome.tabs.sendMessage(tabs[0].id, {action: "extract"}, function(response) {
+      if (chrome.runtime.lastError) {
+        statusDiv.textContent = 'Error: ' + chrome.runtime.lastError.message;
+      } else if (response.error) {
+        statusDiv.textContent = 'Error: ' + response.error;
+      } else {
+        statusDiv.textContent = 'Variables extracted successfully!';
         currentVariables = response.variables;
         updateVariableList();
       }
@@ -27,43 +34,49 @@ function updateVariableList() {
   const variableList = document.getElementById('variableList');
   variableList.innerHTML = '';
 
-  for (const [key, value] of Object.entries(currentVariables)) {
-    const row = document.createElement('div');
-    row.className = 'variable-row';
-    
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'variable-name';
-    nameSpan.textContent = key + ':';
-    row.appendChild(nameSpan);
+  for (const source in currentVariables) {
+    const sourceDiv = document.createElement('div');
+    sourceDiv.className = 'source-section';
+    sourceDiv.innerHTML = `<h3>${source}</h3>`;
 
-    if (isColorValue(value)) {
-      const colorInput = document.createElement('input');
-      colorInput.type = 'color';
-      colorInput.value = convertToHex(value);
-      colorInput.dataset.varName = key;
-      colorInput.addEventListener('input', handleColorChange);
-      row.appendChild(colorInput);
-    } else {
-      const textInput = document.createElement('input');
-      textInput.type = 'text';
-      textInput.value = value;
-      textInput.dataset.varName = key;
-      textInput.addEventListener('input', handleTextChange);
-      row.appendChild(textInput);
+    for (const variable of currentVariables[source].variables) {
+      const row = document.createElement('div');
+      row.className = 'variable-row';
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'variable-name';
+      nameSpan.textContent = variable.name + ':';
+      row.appendChild(nameSpan);
+
+      if (isColorValue(variable.value)) {
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = convertToHex(variable.value);
+        colorInput.dataset.varId = variable.id;
+        colorInput.addEventListener('input', handleColorChange);
+        row.appendChild(colorInput);
+      } else {
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.value = variable.value;
+        textInput.dataset.varId = variable.id;
+        textInput.addEventListener('input', handleTextChange);
+        row.appendChild(textInput);
+      }
+
+      sourceDiv.appendChild(row);
     }
 
-    variableList.appendChild(row);
+    variableList.appendChild(sourceDiv);
   }
 }
 
 function isColorValue(value) {
-  // Check if the value is a valid color (hex, rgb, rgba, hsl, hsla)
   const colorRegex = /^(#[0-9A-Fa-f]{3,8}|(rgb|hsl)a?\(.*\))$/;
   return colorRegex.test(value.trim());
 }
 
 function convertToHex(color) {
-  // Convert various color formats to hex
   const div = document.createElement('div');
   div.style.color = color;
   document.body.appendChild(div);
@@ -75,37 +88,31 @@ function convertToHex(color) {
 }
 
 function handleColorChange(event) {
-  const varName = event.target.dataset.varName;
+  const varId = event.target.dataset.varId;
   const varValue = event.target.value;
-  updateVariable(varName, varValue);
+  updateVariable(varId, varValue);
 }
 
 function handleTextChange(event) {
-  const varName = event.target.dataset.varName;
+  const varId = event.target.dataset.varId;
   const varValue = event.target.value;
-  updateVariable(varName, varValue);
+  updateVariable(varId, varValue);
 }
 
-function updateVariable(name, value) {
-  currentVariables[name] = value;
-  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, {
-      action: "updateVariable",
-      variable: { [name]: value }
-    });
-  });
-}
-
-function extractVariables() {
-  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, {action: "extract"}, (response) => {
-      if (response && response.variables) {
-        currentVariables = response.variables;
-        updateVariableList();
-        alert('CSS variables extracted successfully!');
-      }
-    });
-  });
+function updateVariable(id, value) {
+  for (const source in currentVariables) {
+    const index = currentVariables[source].variables.findIndex(v => v.id === id);
+    if (index !== -1) {
+      currentVariables[source].variables[index].value = value;
+      chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: "updateVariable",
+          variable: currentVariables[source].variables[index]
+        });
+      });
+      break;
+    }
+  }
 }
 
 function exportVariables() {
