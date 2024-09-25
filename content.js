@@ -141,7 +141,34 @@ function extractCurrentStoryVariables(iframeDocument) {
 }
 
 function findShowcasedComponent(doc) {
-  // Implementation remains the same
+  // Try different selectors to find the showcased component
+  const selectors = [
+    '#storybook-root > storybook-root > *:not(storybook-root)',
+    '#storybook-root > *:not(storybook-root)',
+    '#storybook-root storybook-root > *:not(storybook-root)',
+    '#root > *',
+    '.sb-show-main > *'
+  ];
+
+  for (let selector of selectors) {
+    const elements = doc.querySelectorAll(selector);
+    for (let element of elements) {
+      if (element.tagName.toLowerCase() !== 'storybook-root' && !element.tagName.toLowerCase().startsWith('ng-')) {
+        return element;
+      }
+    }
+  }
+
+  // If no matching element found, return the first non-storybook-root child of #storybook-root
+  const rootChildren = doc.querySelectorAll('#storybook-root > *');
+  for (let child of rootChildren) {
+    if (child.tagName.toLowerCase() !== 'storybook-root') {
+      return child;
+    }
+  }
+
+  console.error('Could not find showcased component');
+  return null;
 }
 
 function importVariables(variables) {
