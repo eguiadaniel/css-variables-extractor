@@ -136,12 +136,14 @@ async function extractCSSVariablesForSelectors(stylesheetUrl, sourceKey, origin,
 function extractVariablesFromText(cssText, sourceKey, origin, selectors) {
   console.log(`Extracting variables from ${sourceKey}`);
   const variables = [];
+  const variableMap = new Map();
   const parser = new DOMParser();
   const doc = parser.parseFromString('<style>' + cssText + '</style>', 'text/html');
   const styleElement = doc.querySelector('style');
   const styleSheet = styleElement.sheet;
   console.log(`Number of CSS rules: ${styleSheet.cssRules.length}`);
 
+  // First pass: collect all variables
   for (let i = 0; i < styleSheet.cssRules.length; i++) {
     const rule = styleSheet.cssRules[i];
     if (rule.type === CSSRule.STYLE_RULE) {
@@ -152,21 +154,45 @@ function extractVariablesFromText(cssText, sourceKey, origin, selectors) {
         while ((match = variableRegex.exec(styleText)) !== null) {
           const varName = match[1];
           const varValue = match[2];
-          variables.push({
-            id: `${sourceKey}-${varName.substring(2)}`,
-            name: varName,
-            selector: rule.selectorText,
-            value: varValue,
-            alias: varValue.startsWith('var(') ? varValue.match(/var\((.*?)\)/)[1] : null,
-            origin: origin
-          });
+          variableMap.set(varName, varValue);
         }
       }
     }
   }
+
+  // Second pass: resolve variables and create final structure
+  for (let [varName, varValue] of variableMap) {
+    const resolvedValue = resolveVariableValue(varValue, variableMap);
+    const firstAlias = varValue.startsWith('var(') ? varValue.match(/var\((.*?)\)/)[1] : null;
+    
+    variables.push({
+      id: `${sourceKey}-${varName.substring(2)}`,
+      name: varName,
+      selector: '', // We might need to store this separately if needed
+      value: resolvedValue,
+      alias: firstAlias,
+      origin: origin
+    });
+  }
   
   console.log(`Extracted ${variables.length} variables from ${sourceKey}`);
   return variables;
+}
+
+function resolveVariableValue(value, variableMap) {
+  if (!value.startsWith('var(')) {
+    return value; // Base case: not a variable reference
+  }
+
+  const varName = value.match(/var\((.*?)\)/)[1];
+  const resolvedValue = variableMap.get(varName);
+
+  if (!resolvedValue) {
+    return value; // Variable not found, return original value
+  }
+
+  // Recursive case: resolve the next variable in the chain
+  return resolveVariableValue(resolvedValue, variableMap);
 }
 
 function ruleMatchesSelectors(rule, selectors) {
