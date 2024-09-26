@@ -1,13 +1,15 @@
-// content.js
-let currentVariables = {};
+let extractedData = {
+  mainCss: { info: {}, variables: [] },
+  defaultCss: { info: {}, variables: [] },
+  currentStory: { info: {}, variables: [] }
+};
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Message received in content script:', request);
   if (request.action === "extract") {
     extractAllRelevantCSSVariables()
       .then(cssVariables => {
-        currentVariables = cssVariables;
-        sendResponse({variables: currentVariables});
+        sendResponse({variables: cssVariables});
       })
       .catch(error => {
         console.error('Error extracting CSS variables:', error);
@@ -30,16 +32,15 @@ async function extractAllRelevantCSSVariables() {
   const iframe = document.getElementById('storybook-preview-iframe');
   if (!iframe) {
     console.error('Storybook iframe not found');
-    return {};
+    return extractedData;
   }
 
   const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
 
-  // Find the showcased component using a more flexible approach
   const showcasedComponent = findShowcasedComponent(iframeDocument);
   if (!showcasedComponent) {
     console.error('Showcased component not found');
-    return {};
+    return extractedData;
   }
 
   const relevantSelectors = getAllRelevantSelectors(showcasedComponent);
@@ -49,22 +50,17 @@ async function extractAllRelevantCSSVariables() {
 
   if (!mainStylesheet || !skinStylesheet) {
     console.error('One or both stylesheets not found');
-    return {};
+    return extractedData;
   }
 
-  
-  const allMainCssVariables = await extractCSSVariablesForSelectors(mainStylesheet.href);
-  const allDefaultCssVariables = await extractCSSVariablesForSelectors(skinStylesheet.href);
+  extractedData.mainCss.variables = await extractCSSVariablesForSelectors(mainStylesheet.href, 'mainCss', 'main', null);
+  extractedData.defaultCss.variables = await extractCSSVariablesForSelectors(skinStylesheet.href, 'defaultCss', 'skin', null);
 
-  const mainVariables = await extractCSSVariablesForSelectors(mainStylesheet.href, relevantSelectors);
-  const skinVariables = await extractCSSVariablesForSelectors(skinStylesheet.href, relevantSelectors);
-  const onlyCurrentStoryVariables = { ...mainVariables, ...skinVariables };
+  const mainVariables = await extractCSSVariablesForSelectors(mainStylesheet.href, 'currentStory', 'main', relevantSelectors);
+  const skinVariables = await extractCSSVariablesForSelectors(skinStylesheet.href, 'currentStory', 'skin', relevantSelectors);
+  extractedData.currentStory.variables = [...mainVariables, ...skinVariables];
 
-  return {
-    mainCss: allMainCssVariables,
-    defaultCss: allDefaultCssVariables,
-    currentStory: onlyCurrentStoryVariables,
-  };
+  return extractedData;
 }
 
 function findShowcasedComponent(doc) {
@@ -123,51 +119,63 @@ function getAllRelevantSelectors(element) {
   return Array.from(selectors);
 }
   
-  async function extractCSSVariablesForSelectors(stylesheetUrl, selectors = null) {
-    try {
-      const response = await fetch(stylesheetUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const cssText = await response.text();
-      return extractVariablesFromText(cssText, selectors);
-    } catch (error) {
-      console.error(`Error fetching stylesheet ${stylesheetUrl}:`, error);
-      return {};
+async function extractCSSVariablesForSelectors(stylesheetUrl, sourceKey, origin, selectors = null) {
+  try {
+    const response = await fetch(stylesheetUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    const cssText = await response.text();
+    return extractVariablesFromText(cssText, sourceKey, origin, selectors);
+  } catch (error) {
+    console.error(`Error fetching stylesheet ${stylesheetUrl}:`, error);
+    return [];
   }
+}
   
-  function extractVariablesFromText(cssText, selectors = null) {
-    const variables = {};
-    const parser = new DOMParser();
-    const doc = parser.parseFromString('<style>' + cssText + '</style>', 'text/html');
-    const styleElement = doc.querySelector('style');
-    const styleSheet = styleElement.sheet;
-  
-    for (let i = 0; i < styleSheet.cssRules.length; i++) {
-      const rule = styleSheet.cssRules[i];
-      if (rule.type === CSSRule.STYLE_RULE) {
-        if (selectors === null || ruleMatchesSelectors(rule, selectors)) {
-          const styleText = rule.style.cssText;
-          const variableRegex = /(--.+?):\s*(.+?);/g;
-          let match;
-          while ((match = variableRegex.exec(styleText)) !== null) {
-            variables[match[1]] = match[2];
-          }
+function extractVariablesFromText(cssText, sourceKey, origin, selectors) {
+  console.log(`Extracting variables from ${sourceKey}`);
+  const variables = [];
+  const parser = new DOMParser();
+  const doc = parser.parseFromString('<style>' + cssText + '</style>', 'text/html');
+  const styleElement = doc.querySelector('style');
+  const styleSheet = styleElement.sheet;
+  console.log(`Number of CSS rules: ${styleSheet.cssRules.length}`);
+
+  for (let i = 0; i < styleSheet.cssRules.length; i++) {
+    const rule = styleSheet.cssRules[i];
+    if (rule.type === CSSRule.STYLE_RULE) {
+      if (selectors === null || ruleMatchesSelectors(rule, selectors)) {
+        const styleText = rule.style.cssText;
+        const variableRegex = /(--.+?):\s*(.+?);/g;
+        let match;
+        while ((match = variableRegex.exec(styleText)) !== null) {
+          const varName = match[1];
+          const varValue = match[2];
+          variables.push({
+            id: `${sourceKey}-${varName.substring(2)}`,
+            name: varName,
+            selector: rule.selectorText,
+            value: varValue,
+            alias: varValue.startsWith('var(') ? varValue.match(/var\((.*?)\)/)[1] : null,
+            origin: origin
+          });
         }
       }
     }
+  }
   
-    return variables;
-  }
+  console.log(`Extracted ${variables.length} variables from ${sourceKey}`);
+  return variables;
+}
 
-  function ruleMatchesSelectors(rule, selectors) {
-    if (!selectors || selectors.length === 0) {
-      return true;  // If no selectors provided, match all rules
-    }
-    const ruleSelectors = rule.selectorText.split(',').map(s => s.trim());
-    return ruleSelectors.some(selector => selectors.includes(selector));
+function ruleMatchesSelectors(rule, selectors) {
+  if (!selectors || selectors.length === 0) {
+    return true;  // If no selectors provided, match all rules
   }
+  const ruleSelectors = rule.selectorText.split(',').map(s => s.trim());
+  return ruleSelectors.some(selector => selectors.includes(selector));
+}
   
   function applyCSSVariablesToShowcasedComponent(variables) {
     const iframe = document.getElementById('storybook-preview-iframe');
@@ -207,11 +215,11 @@ function getAllRelevantSelectors(element) {
   
   // Initial extraction of variables when the script loads
   extractAllRelevantCSSVariables()
-    .then(cssVariables => {
-      currentVariables = {...cssVariables.main, ...cssVariables.skin};
-    })
-    .catch(error => {
-      console.error('Error extracting initial CSS variables:', error);
-    });
-  
-  console.log('Content script loaded');
+  .then(cssVariables => {
+    extractedData = cssVariables;
+  })
+  .catch(error => {
+    console.error('Error extracting initial CSS variables:', error);
+  });
+
+console.log('Content script loaded');
