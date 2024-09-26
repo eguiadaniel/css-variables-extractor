@@ -1,23 +1,21 @@
 {
-    "manifest_version": 3,
-    "name": "Storybook CSS Variable Extractor",
-    "version": "1.0",
-    "description": "Extract and edit CSS variables from Storybook",
-    "permissions": [
-      "activeTab",
-      "storage",
-      "downloads"
-    ],
-    "host_permissions": [
-      "<all_urls>"
-    ],
-    "action": {
-      "default_popup": "popup.html"
-    },
-    "content_scripts": [
-      {
-        "matches": ["<all_urls>"],
-        "js": ["content.js"]
-      }
-    ]
-  }
+  "manifest_version": 3,
+  "name": "Storybook CSS Variable Extractor",
+  "version": "1.0",
+  "description": "Extract and edit CSS variables from Storybook",
+  "permissions": ["activeTab", "storage", "downloads"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "dist/popup.html"
+  },
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content.js"],
+      "css": ["dist/styles.css"]
+    }
+  ]
+}
