@@ -1,23 +1,50 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Storybook CSS Variable Extractor</title>
-  <style>
-    body { width: 400px; padding: 10px; font-family: Arial, sans-serif; }
-    button { margin: 5px 0; display: block; width: 100%; }
-    #variableList { margin-top: 20px; max-height: 400px; overflow-y: auto; }
-    .variable-row { margin-bottom: 10px; display: flex; align-items: center; }
-    .variable-name { font-weight: bold; margin-right: 10px; flex: 1; }
-    input[type="text"], input[type="color"] { width: 100px; }
-    input[type="color"] { height: 30px; padding: 0; border: none; }
-  </style>
-</head>
-<body>
-  <button id="extract">Extract CSS Variables</button>
-  <button id="export">Export to JSON</button>
-  <input type="file" id="importFile" accept=".json" style="display: none;">
-  <button id="import">Import from JSON</button>
-  <div id="variableList"></div>
-  <script src="popup.js"></script>
-</body>
+  <head>
+    <title>Storybook CSS Variable Extractor</title>
+    <style>
+      body {
+        width: 400px;
+        padding: 10px;
+        font-family: Arial, sans-serif;
+      }
+      button {
+        margin: 5px 0;
+        display: block;
+        width: 100%;
+      }
+      #variableList {
+        margin-top: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .variable-row {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+      }
+      .variable-name {
+        font-weight: bold;
+        margin-right: 10px;
+        flex: 1;
+      }
+      input[type="text"],
+      input[type="color"] {
+        width: 100px;
+      }
+      input[type="color"] {
+        height: 30px;
+        padding: 0;
+        border: none;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="extract">Extract CSS Variables</button>
+    <button id="export">Export to JSON</button>
+    <input type="file" id="importFile" accept=".json" style="display: none" />
+    <button id="import">Import from JSON</button>
+    <div id="variableList"></div>
+    <script src="popup.js"></script>
+  </body>
 </html>
