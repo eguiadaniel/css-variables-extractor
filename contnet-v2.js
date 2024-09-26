@@ -6,7 +6,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "extract") {
     extractAllRelevantCSSVariables()
       .then(cssVariables => {
-        currentVariables = cssVariables;
+        currentVariables = {...cssVariables.main, ...cssVariables.skin};
         sendResponse({variables: currentVariables});
       })
       .catch(error => {
@@ -35,7 +35,6 @@ async function extractAllRelevantCSSVariables() {
 
   const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
 
-  // Find the showcased component using a more flexible approach
   const showcasedComponent = findShowcasedComponent(iframeDocument);
   if (!showcasedComponent) {
     console.error('Showcased component not found');
@@ -52,12 +51,12 @@ async function extractAllRelevantCSSVariables() {
     return {};
   }
 
-  
-  const allMainCssVariables = await extractCSSVariablesForSelectors(mainStylesheet.href);
-  const allDefaultCssVariables = await extractCSSVariablesForSelectors(skinStylesheet.href);
+  const allMainCssVariables = await extractAllCSSVariables(mainStylesheet.href);
+  const allDefaultCssVariables = await extractAllCSSVariables(skinStylesheet.href);
 
   const mainVariables = await extractCSSVariablesForSelectors(mainStylesheet.href, relevantSelectors);
   const skinVariables = await extractCSSVariablesForSelectors(skinStylesheet.href, relevantSelectors);
+
   const onlyCurrentStoryVariables = { ...mainVariables, ...skinVariables };
 
   return {
@@ -65,6 +64,66 @@ async function extractAllRelevantCSSVariables() {
     defaultCss: allDefaultCssVariables,
     currentStory: onlyCurrentStoryVariables,
   };
+}
+
+async function extractAllCSSVariables(stylesheetUrl) {
+  try {
+    const response = await fetch(stylesheetUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const cssText = await response.text();
+    return extractVariablesFromText(cssText, null);  // Explicitly pass null for selectors
+  } catch (error) {
+    console.error(`Error fetching stylesheet ${stylesheetUrl}:`, error);
+    return {};
+  }
+}
+
+async function extractCSSVariablesForSelectors(stylesheetUrl, selectors) {
+  try {
+    const response = await fetch(stylesheetUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const cssText = await response.text();
+    return extractVariablesFromText(cssText, selectors);
+  } catch (error) {
+    console.error(`Error fetching stylesheet ${stylesheetUrl}:`, error);
+    return {};
+  }
+}
+
+function extractVariablesFromText(cssText, selectors = null) {
+  const variables = {};
+  const parser = new DOMParser();
+  const doc = parser.parseFromString('<style>' + cssText + '</style>', 'text/html');
+  const styleElement = doc.querySelector('style');
+  const styleSheet = styleElement.sheet;
+
+  for (let i = 0; i < styleSheet.cssRules.length; i++) {
+    const rule = styleSheet.cssRules[i];
+    if (rule.type === CSSRule.STYLE_RULE) {
+      if (selectors === null || ruleMatchesSelectors(rule, selectors)) {
+        const styleText = rule.style.cssText;
+        const variableRegex = /(--.+?):\s*(.+?);/g;
+        let match;
+        while ((match = variableRegex.exec(styleText)) !== null) {
+          variables[match[1]] = match[2];
+        }
+      }
+    }
+  }
+
+  return variables;
+}
+
+function ruleMatchesSelectors(rule, selectors) {
+  if (!selectors || selectors.length === 0) {
+    return true;  // If no selectors provided, match all rules
+  }
+  const ruleSelectors = rule.selectorText.split(',').map(s => s.trim());
+  return ruleSelectors.some(selector => selectors.includes(selector));
 }
 
 function findShowcasedComponent(doc) {
@@ -123,7 +182,7 @@ function getAllRelevantSelectors(element) {
   return Array.from(selectors);
 }
   
-  async function extractCSSVariablesForSelectors(stylesheetUrl, selectors = null) {
+  async function extractCSSVariablesForSelectors(stylesheetUrl, selectors) {
     try {
       const response = await fetch(stylesheetUrl);
       if (!response.ok) {
@@ -137,7 +196,7 @@ function getAllRelevantSelectors(element) {
     }
   }
   
-  function extractVariablesFromText(cssText, selectors = null) {
+  function extractVariablesFromText(cssText, selectors) {
     const variables = {};
     const parser = new DOMParser();
     const doc = parser.parseFromString('<style>' + cssText + '</style>', 'text/html');
@@ -147,7 +206,8 @@ function getAllRelevantSelectors(element) {
     for (let i = 0; i < styleSheet.cssRules.length; i++) {
       const rule = styleSheet.cssRules[i];
       if (rule.type === CSSRule.STYLE_RULE) {
-        if (selectors === null || ruleMatchesSelectors(rule, selectors)) {
+        const ruleSelectors = rule.selectorText.split(',').map(s => s.trim());
+        if (ruleSelectors.some(selector => selectors.includes(selector))) {
           const styleText = rule.style.cssText;
           const variableRegex = /(--.+?):\s*(.+?);/g;
           let match;
@@ -159,14 +219,6 @@ function getAllRelevantSelectors(element) {
     }
   
     return variables;
-  }
-
-  function ruleMatchesSelectors(rule, selectors) {
-    if (!selectors || selectors.length === 0) {
-      return true;  // If no selectors provided, match all rules
-    }
-    const ruleSelectors = rule.selectorText.split(',').map(s => s.trim());
-    return ruleSelectors.some(selector => selectors.includes(selector));
   }
   
   function applyCSSVariablesToShowcasedComponent(variables) {
