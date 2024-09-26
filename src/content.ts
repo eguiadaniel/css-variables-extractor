@@ -39,7 +39,23 @@ chrome.runtime.onMessage.addListener(
     if (request.action === "extract") {
       extractAllRelevantCSSVariables()
         .then((cssVariables) => {
-          sendResponse({ variables: cssVariables });
+          // Update currentVariables with the extracted data
+          currentVariables = {};
+          cssVariables.mainCss.variables.forEach(
+            (v) => (currentVariables[v.name] = v.value)
+          );
+          cssVariables.defaultCss.variables.forEach(
+            (v) => (currentVariables[v.name] = v.value)
+          );
+          cssVariables.currentStory.variables.forEach(
+            (v) => (currentVariables[v.name] = v.value)
+          );
+
+          console.log(
+            "Extracted and updated currentVariables:",
+            currentVariables
+          );
+          sendResponse({ variables: currentVariables });
         })
         .catch((error) => {
           console.error("Error extracting CSS variables:", error);
@@ -340,12 +356,13 @@ function updateVariable(variable: { [key: string]: string }): void {
 }
 
 // Initial extraction of variables when the script loads
-extractAllRelevantCSSVariables()
-  .then((cssVariables) => {
-    extractedData = cssVariables;
-  })
-  .catch((error) => {
-    console.error("Error extracting initial CSS variables:", error);
-  });
+// extractAllRelevantCSSVariables()
+//   .then((cssVariables) => {
+//     extractedData = cssVariables;
+//   })
+//   .catch((error) => {
+//     console.error("Error extracting initial CSS variables:", error);
+//   });
 
-console.log("Content script loaded");
+// At the end of the file, add:
+console.log("Content script loaded. Current variables:", currentVariables);
