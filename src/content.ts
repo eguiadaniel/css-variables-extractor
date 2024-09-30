@@ -81,20 +81,32 @@ async function extractAllRelevantCSSVariables(): Promise<ExtractedData> {
   ) as HTMLIFrameElement | null;
   if (!iframe) {
     console.error("Storybook iframe not found");
-    return extractedData;
+    return {
+      mainCss: { info: {}, variables: [] },
+      defaultCss: { info: {}, variables: [] },
+      currentStory: { info: {}, variables: [] },
+    };
   }
 
   const iframeDocument =
     iframe.contentDocument || iframe.contentWindow?.document;
   if (!iframeDocument) {
     console.error("Unable to access iframe document");
-    return extractedData;
+    return {
+      mainCss: { info: {}, variables: [] },
+      defaultCss: { info: {}, variables: [] },
+      currentStory: { info: {}, variables: [] },
+    };
   }
 
   const showcasedComponent = findShowcasedComponent(iframeDocument);
   if (!showcasedComponent) {
     console.error("Showcased component not found");
-    return extractedData;
+    return {
+      mainCss: { info: {}, variables: [] },
+      defaultCss: { info: {}, variables: [] },
+      currentStory: { info: {}, variables: [] },
+    };
   }
 
   const relevantSelectors = getAllRelevantSelectors(showcasedComponent);
@@ -108,37 +120,56 @@ async function extractAllRelevantCSSVariables(): Promise<ExtractedData> {
 
   if (!mainStylesheet || !skinStylesheet) {
     console.error("One or both stylesheets not found");
-    return extractedData;
+    return {
+      mainCss: { info: {}, variables: [] },
+      defaultCss: { info: {}, variables: [] },
+      currentStory: { info: {}, variables: [] },
+    };
   }
 
-  extractedData.mainCss.variables = await extractCSSVariablesForSelectors(
+  const mainCssVariables = await extractCSSVariablesForSelectors(
     mainStylesheet.href,
     "mainCss",
     "main",
     null
   );
-  extractedData.defaultCss.variables = await extractCSSVariablesForSelectors(
+  const defaultCssVariables = await extractCSSVariablesForSelectors(
     skinStylesheet.href,
     "defaultCss",
     "skin",
     null
   );
 
-  const mainVariables = await extractCSSVariablesForSelectors(
+  const mainStoryVariables = await extractCSSVariablesForSelectors(
     mainStylesheet.href,
     "currentStory",
     "main",
     relevantSelectors
   );
-  const skinVariables = await extractCSSVariablesForSelectors(
+  const skinStoryVariables = await extractCSSVariablesForSelectors(
     skinStylesheet.href,
     "currentStory",
     "skin",
     relevantSelectors
   );
-  extractedData.currentStory.variables = [...mainVariables, ...skinVariables];
 
-  return extractedData;
+  console.log("extractAllRelevantCSSVariables", {
+    mainCss: { info: {}, variables: mainCssVariables },
+    defaultCss: { info: {}, variables: defaultCssVariables },
+    currentStory: {
+      info: {},
+      variables: [...mainStoryVariables, ...skinStoryVariables],
+    },
+  });
+
+  return {
+    mainCss: { info: {}, variables: mainCssVariables },
+    defaultCss: { info: {}, variables: defaultCssVariables },
+    currentStory: {
+      info: {},
+      variables: [...mainStoryVariables, ...skinStoryVariables],
+    },
+  };
 }
 
 function findShowcasedComponent(doc: Document): Element | null {
@@ -153,6 +184,7 @@ function findShowcasedComponent(doc: Document): Element | null {
   for (let selector of selectors) {
     const elements = doc.querySelectorAll(selector);
     for (let element of elements) {
+      console.log("element", element);
       if (
         element.tagName.toLowerCase() !== "storybook-root" &&
         !element.tagName.toLowerCase().startsWith("ng-")
@@ -165,6 +197,7 @@ function findShowcasedComponent(doc: Document): Element | null {
   const rootChildren = doc.querySelectorAll("#storybook-root > *");
   for (let child of rootChildren) {
     if (child.tagName.toLowerCase() !== "storybook-root") {
+      console.log("child", child);
       return child;
     }
   }
@@ -272,6 +305,7 @@ function extractVariablesFromText(
   }
 
   console.log(`Extracted ${variables.length} variables from ${sourceKey}`);
+  console.log("extractVariablesFromText", variables);
   return variables;
 }
 
@@ -357,11 +391,17 @@ function updateVariable(variable: { [key: string]: string }): void {
 
 // Initial extraction of variables when the script loads
 // extractAllRelevantCSSVariables()
-//   .then((cssVariables) => {
-//     extractedData = cssVariables;
+//   .then((cssVariables: ExtractedData) => {
+//     currentVariables = {};
+//     [
+//       ...cssVariables.mainCss.variables,
+//       ...cssVariables.defaultCss.variables,
+//       ...cssVariables.currentStory.variables,
+//     ].forEach((v) => (currentVariables[v.name] = v.value));
+//     console.log("Extracted and updated currentVariables:", currentVariables);
 //   })
 //   .catch((error) => {
-//     console.error("Error extracting initial CSS variables:", error);
+//     console.error("Error extracting CSS variables:", error);
 //   });
 
 // At the end of the file, add:
