@@ -31,6 +31,7 @@ let extractedData: ExtractedData = {
 };
 
 let currentVariables: { [key: string]: string } = {};
+let allVariables: CSSVariable[] = [];
 
 chrome.runtime.onMessage.addListener(
   (
@@ -43,17 +44,15 @@ chrome.runtime.onMessage.addListener(
       extractAllRelevantCSSVariables()
         .then((cssVariables) => {
           // Update currentVariables with the extracted data
+          allVariables = cssVariables;
           currentVariables = {};
           cssVariables.forEach((v) => {
             currentVariables[v.name] = v.value;
           });
 
-          console.log(
-            "Extracted and updated currentVariables:",
-            currentVariables
-          );
-          console.log(cssVariables);
-          console.log(currentVariables);
+          console.log("Extracted and updated currentVariables:");
+          console.log("cssVariables", cssVariables);
+          console.log("currentVariables", currentVariables);
           sendResponse({ variables: cssVariables }); // Send the full array of CSSVariables
         })
         .catch((error) => {
@@ -68,8 +67,8 @@ chrome.runtime.onMessage.addListener(
     } else if (request.action === "updateVariable") {
       updateVariable(request.variable);
       sendResponse({ success: true });
-    } else if (request.action === "getVariables") {
-      sendResponse({ variables: currentVariables });
+    } else if (request.action === "exportVariables") {
+      sendResponse({ variables: allVariables });
     }
   }
 );

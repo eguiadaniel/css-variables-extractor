@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Storybook CSS Variable Extractor</title>
+    <title>CSS Variable Extractor</title>
     <style>
       body {
         width: 400px;
@@ -37,13 +37,24 @@
         padding: 0;
         border: none;
       }
+      .variable-category {
+        margin-bottom: 20px;
+      }
+      h3 {
+        margin-bottom: 10px;
+      }
+      ul {
+        list-style-type: none;
+        padding-left: 0;
+      }
     </style>
   </head>
   <body>
+    <h1>CSS Variable Extractor</h1>
     <button id="extract">Extract CSS Variables</button>
     <button id="export">Export to JSON</button>
-    <input type="file" id="importFile" accept=".json" style="display: none" />
     <button id="import">Import from JSON</button>
+    <input type="file" id="importFile" style="display: none" />
     <div id="variableList"></div>
     <script src="popup.js"></script>
   </body>

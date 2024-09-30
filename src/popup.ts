@@ -61,7 +61,7 @@ function exportVariables() {
     if (activeTab.id) {
       chrome.tabs.sendMessage(
         activeTab.id,
-        { action: "getVariables" },
+        { action: "exportVariables" },
         function (response) {
           if (chrome.runtime.lastError) {
             console.error(chrome.runtime.lastError);
@@ -128,7 +128,7 @@ function loadAndDisplayVariables() {
     if (activeTab.id) {
       chrome.tabs.sendMessage(
         activeTab.id,
-        { action: "getVariables" },
+        { action: "exportVariables" },
         function (response) {
           if (chrome.runtime.lastError) {
             console.error(chrome.runtime.lastError);
@@ -141,16 +141,43 @@ function loadAndDisplayVariables() {
   });
 }
 
-function updateVariableList(variables: { [key: string]: string }) {
+function updateVariableList(variables: CSSVariable[]) {
   console.log("Updating variable list", variables);
   const variableList = document.getElementById("variableList");
   if (variableList) {
     variableList.innerHTML = "";
-    for (const [key, value] of Object.entries(variables)) {
+
+    // Crear tres divs para las diferentes categorías
+    const currentStoryDiv = document.createElement("div");
+    currentStoryDiv.className = "variable-category";
+    currentStoryDiv.innerHTML = "<h3>Variables in Current Story</h3>";
+
+    const mainOriginDiv = document.createElement("div");
+    mainOriginDiv.className = "variable-category";
+    mainOriginDiv.innerHTML = "<h3>Variables with Origin: main</h3>";
+
+    const skinOriginDiv = document.createElement("div");
+    skinOriginDiv.className = "variable-category";
+    skinOriginDiv.innerHTML = "<h3>Variables with Origin: skin</h3>";
+
+    variables.forEach((variable) => {
       const listItem = document.createElement("li");
-      listItem.textContent = `${key}: ${value}`;
-      variableList.appendChild(listItem);
-    }
+      listItem.textContent = `${variable.name}: ${variable.value}`;
+
+      if (variable.inCurrentStory) {
+        currentStoryDiv.appendChild(listItem);
+      }
+
+      if (variable.origin === "main") {
+        mainOriginDiv.appendChild(listItem.cloneNode(true));
+      } else if (variable.origin === "skin") {
+        skinOriginDiv.appendChild(listItem.cloneNode(true));
+      }
+    });
+
+    variableList.appendChild(currentStoryDiv);
+    variableList.appendChild(mainOriginDiv);
+    variableList.appendChild(skinOriginDiv);
   }
 }
 
