@@ -135,13 +135,21 @@ async function extractAllRelevantCSSVariables(): Promise<CSSVariable[]> {
     "skin",
     relevantSelectors
   );
+  const variableMap = new Map<string, CSSVariable>();
 
-  const allVariables = [
+  [
     ...mainCssVariables,
     ...defaultCssVariables,
     ...mainStoryVariables,
     ...skinStoryVariables,
-  ];
+  ].forEach((variable) => {
+    const existingVariable = variableMap.get(variable.name);
+    if (!existingVariable || variable.inCurrentStory) {
+      variableMap.set(variable.name, variable);
+    }
+  });
+
+  const allVariables = Array.from(variableMap.values());
 
   console.log("extractAllRelevantCSSVariables()", allVariables);
   return allVariables;
@@ -350,8 +358,6 @@ function applyCSSVariablesToShowcasedComponent(variables: {
     }
 
     // Aplicar inline style a todos los hijos porque desde la lista de variables, no sabemos a que elementos se le aplica.
-
-    // Aplicar inline style a todos los hijos
     applyVariablesToElementAndChildren(showcasedComponent, variables);
 
     // Actualizar las variables CSS actuales
