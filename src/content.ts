@@ -268,12 +268,15 @@ function extractVariablesFromText(
         relevantSelectors === null ||
         ruleMatchesSelectors(styleRule, relevantSelectors);
 
+      const isRootRule = styleRule.selectorText === ":root";
+
       const styleText = styleRule.style.cssText;
-      const variableRegex = /(--.+?):\s*(.+?);/g;
+      // Updated regex to handle multiple variable declarations
+      const variableRegex = /(--.+?):\s*([^;]+)/g;
       let match;
       while ((match = variableRegex.exec(styleText)) !== null) {
-        const varName = match[1];
-        const varValue = match[2];
+        const varName = match[1].trim();
+        const varValue = match[2].trim();
         variableMap.set(varName, varValue);
 
         const resolvedValue = resolveVariableValue(varValue, variableMap);
