@@ -205,24 +205,28 @@ function createVariableListItem(
 ): HTMLLIElement {
   const listItem = document.createElement("li");
   listItem.className = "variable-item";
-  listItem.id = `var-${variable.name.slice(2)}`; // Remove leading '--' for the id
+  listItem.id = `var-${variable.name.slice(2)}`;
 
   const nameSpan = document.createElement("span");
   nameSpan.className = "variable-name";
   nameSpan.textContent = variable.name;
+  listItem.appendChild(nameSpan);
+
+  const valueContainer = document.createElement("div");
+  valueContainer.className = "variable-value-container";
 
   const valueSpan = document.createElement("span");
   valueSpan.className = "variable-value";
 
-  if (isColor(variable.value)) {
+  if (isColor(variable.resolvedValue)) {
     const colorPicker = document.createElement("input");
     colorPicker.type = "color";
-    colorPicker.value = rgbToHex(variable.value);
+    colorPicker.value = rgbToHex(variable.resolvedValue);
     valueSpan.appendChild(colorPicker);
 
     const colorText = document.createElement("input");
     colorText.type = "text";
-    colorText.value = variable.value;
+    colorText.value = variable.resolvedValue;
     colorText.className = "color-text";
     valueSpan.appendChild(colorText);
 
@@ -240,34 +244,10 @@ function createVariableListItem(
         updateVariableValue(variable.name, newColor);
       }
     });
-  } else if (variable.value.startsWith("var(")) {
-    const linkSpan = document.createElement("span");
-    linkSpan.className = "link-wrapper";
-    linkSpan.innerHTML = createLinkedValue(variable.value, variableMap);
-
-    const textInput = document.createElement("input");
-    textInput.type = "text";
-    textInput.value = variable.value;
-    textInput.className = "text-input linked-input";
-
-    valueSpan.appendChild(linkSpan);
-    valueSpan.appendChild(textInput);
-
-    // Add event listener for text input
-    textInput.addEventListener("input", (event) => {
-      const newValue = (event.target as HTMLInputElement).value;
-      updateVariableValue(variable.name, newValue);
-      linkSpan.innerHTML = createLinkedValue(newValue, variableMap);
-    });
-
-    // Prevent input focus when clicking on the link
-    linkSpan.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-    });
   } else {
     const textInput = document.createElement("input");
     textInput.type = "text";
-    textInput.value = variable.value;
+    textInput.value = variable.resolvedValue;
     textInput.className = "text-input";
     valueSpan.appendChild(textInput);
 
@@ -278,24 +258,34 @@ function createVariableListItem(
     });
   }
 
-  listItem.appendChild(nameSpan);
-  listItem.appendChild(valueSpan);
+  valueContainer.appendChild(valueSpan);
+
+  const aliasContainer = document.createElement("div");
+  aliasContainer.style.display = "flex";
+  aliasContainer.style.flexDirection = "column";
+
+  const aliasSpan = document.createElement("span");
+  aliasSpan.className = "variable-alias";
+  if (variable.alias) {
+    aliasSpan.innerHTML = `Alias: <a href="#var-${variable.alias.slice(
+      2
+    )}" class="variable-link">${variable.alias}</a>`;
+    aliasContainer.appendChild(aliasSpan);
+  }
+
+  const aliasOriginSpan = document.createElement("span");
+  aliasOriginSpan.className = "variable-alias-origin";
+  if (variable.aliasOrigin && variable.aliasOrigin !== variable.alias) {
+    aliasOriginSpan.innerHTML = `Origin: <a href="#var-${variable.aliasOrigin.slice(
+      2
+    )}" class="variable-link">${variable.aliasOrigin}</a>`;
+    aliasContainer.appendChild(aliasOriginSpan);
+  }
+
+  valueContainer.appendChild(aliasContainer);
+  listItem.appendChild(valueContainer);
 
   return listItem;
-}
-
-function createLinkedValue(
-  value: string,
-  variableMap: Map<string, CSSVariable>
-): string {
-  return value.replace(/var\((--[\w-]+)\)/g, (match, varName) => {
-    if (variableMap.has(varName)) {
-      return `<a href="#var-${varName.slice(
-        2
-      )}" class="variable-link">${match}</a>`;
-    }
-    return match;
-  });
 }
 
 function isColor(value: string): boolean {
