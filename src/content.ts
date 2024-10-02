@@ -323,6 +323,8 @@ function ruleMatchesSelectors(
   return ruleSelectors.some((selector) => selectors.includes(selector));
 }
 
+let currentCSSVariables: { [key: string]: string } = {};
+
 function applyCSSVariablesToShowcasedComponent(variables: {
   [key: string]: string;
 }): void {
@@ -347,7 +349,33 @@ function applyCSSVariablesToShowcasedComponent(variables: {
       return;
     }
 
+    // Aplicar inline style a todos los hijos porque desde la lista de variables, no sabemos a que elementos se le aplica.
+
+    // Aplicar inline style a todos los hijos
     applyVariablesToElementAndChildren(showcasedComponent, variables);
+
+    // Actualizar las variables CSS actuales
+    Object.assign(currentCSSVariables, variables);
+
+    // Buscar o crear un elemento de estilo único
+    let styleElement = iframeDocument.head.querySelector(
+      "style#dynamic-variables"
+    ) as HTMLStyleElement;
+    if (!styleElement) {
+      styleElement = iframeDocument.createElement("style");
+      styleElement.id = "dynamic-variables";
+      iframeDocument.head.appendChild(styleElement);
+    }
+
+    // Generar el contenido CSS
+    let css = ":root {\n";
+    for (const [key, value] of Object.entries(currentCSSVariables)) {
+      css += `  ${key}: ${value} !important;\n`;
+    }
+    css += "}";
+
+    // Actualizar el contenido del elemento de estilo
+    styleElement.textContent = css;
   } catch (e) {
     console.error("Error applying CSS variables:", e);
   }

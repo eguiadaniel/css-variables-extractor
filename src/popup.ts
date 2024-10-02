@@ -140,6 +140,7 @@ function loadAndDisplayVariables() {
     }
   });
 }
+
 function updateVariableList(variables: CSSVariable[]) {
   console.log("Updating variable list", variables);
   const variableList = document.getElementById("variableList");
@@ -216,14 +217,66 @@ function createVariableListItem(
   if (isColor(variable.value)) {
     const colorPicker = document.createElement("input");
     colorPicker.type = "color";
-    colorPicker.value = variable.value;
-    colorPicker.disabled = true;
+    colorPicker.value = rgbToHex(variable.value);
     valueSpan.appendChild(colorPicker);
-  }
 
-  const valueText = document.createElement("span");
-  valueText.innerHTML = createLinkedValue(variable.value, variableMap);
-  valueSpan.appendChild(valueText);
+    const colorText = document.createElement("input");
+    colorText.type = "text";
+    colorText.value = variable.value;
+    colorText.className = "color-text";
+    valueSpan.appendChild(colorText);
+
+    // Add event listeners for color picker and text input
+    colorPicker.addEventListener("input", (event) => {
+      const newColor = (event.target as HTMLInputElement).value;
+      colorText.value = hexToRgb(newColor);
+      updateVariableValue(variable.name, hexToRgb(newColor));
+    });
+
+    colorText.addEventListener("input", (event) => {
+      const newColor = (event.target as HTMLInputElement).value;
+      if (isColor(newColor)) {
+        colorPicker.value = rgbToHex(newColor);
+        updateVariableValue(variable.name, newColor);
+      }
+    });
+  } else if (variable.value.startsWith("var(")) {
+    const linkSpan = document.createElement("span");
+    linkSpan.className = "link-wrapper";
+    linkSpan.innerHTML = createLinkedValue(variable.value, variableMap);
+
+    const textInput = document.createElement("input");
+    textInput.type = "text";
+    textInput.value = variable.value;
+    textInput.className = "text-input linked-input";
+
+    valueSpan.appendChild(linkSpan);
+    valueSpan.appendChild(textInput);
+
+    // Add event listener for text input
+    textInput.addEventListener("input", (event) => {
+      const newValue = (event.target as HTMLInputElement).value;
+      updateVariableValue(variable.name, newValue);
+      linkSpan.innerHTML = createLinkedValue(newValue, variableMap);
+    });
+
+    // Prevent input focus when clicking on the link
+    linkSpan.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+    });
+  } else {
+    const textInput = document.createElement("input");
+    textInput.type = "text";
+    textInput.value = variable.value;
+    textInput.className = "text-input";
+    valueSpan.appendChild(textInput);
+
+    // Add event listener for text input
+    textInput.addEventListener("input", (event) => {
+      const newValue = (event.target as HTMLInputElement).value;
+      updateVariableValue(variable.name, newValue);
+    });
+  }
 
   listItem.appendChild(nameSpan);
   listItem.appendChild(valueSpan);
@@ -246,8 +299,44 @@ function createLinkedValue(
 }
 
 function isColor(value: string): boolean {
-  // Simple check for hex colors, rgb, rgba, hsl, hsla
-  return /^(#|rgb|hsl)/.test(value);
+  return /^(#|rgb|rgba|hsl|hsla)/.test(value);
+}
+
+function rgbToHex(rgb: string): string {
+  // Convert rgb(r, g, b) to #rrggbb
+  const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+  if (match) {
+    return (
+      "#" +
+      match
+        .slice(1)
+        .map((n) => parseInt(n, 10).toString(16).padStart(2, "0"))
+        .join("")
+    );
+  }
+  return rgb;
+}
+
+function hexToRgb(hex: string): string {
+  // Convert #rrggbb to rgb(r, g, b)
+  const bigint = parseInt(hex.slice(1), 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function updateVariableValue(name: string, value: string) {
+  // Send message to content script to update the variable
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    const activeTab = tabs[0];
+    if (activeTab.id) {
+      chrome.tabs.sendMessage(activeTab.id, {
+        action: "updateVariable",
+        variable: { [name]: value },
+      });
+    }
+  });
 }
 
 console.log("Popup script loaded");
