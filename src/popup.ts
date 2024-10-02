@@ -140,45 +140,114 @@ function loadAndDisplayVariables() {
     }
   });
 }
-
 function updateVariableList(variables: CSSVariable[]) {
   console.log("Updating variable list", variables);
   const variableList = document.getElementById("variableList");
   if (variableList) {
     variableList.innerHTML = "";
 
-    // Crear tres divs para las diferentes categorías
-    const currentStoryDiv = document.createElement("div");
-    currentStoryDiv.className = "variable-category";
-    currentStoryDiv.innerHTML = "<h3>Variables in Current Story</h3>";
+    const categories = [
+      {
+        name: "Variables in Current Story",
+        filter: (v: CSSVariable) => v.inCurrentStory,
+      },
+      {
+        name: "Variables with Origin: main",
+        filter: (v: CSSVariable) => v.origin === "main",
+      },
+      {
+        name: "Variables with Origin: skin",
+        filter: (v: CSSVariable) => v.origin === "skin",
+      },
+    ];
 
-    const mainOriginDiv = document.createElement("div");
-    mainOriginDiv.className = "variable-category";
-    mainOriginDiv.innerHTML = "<h3>Variables with Origin: main</h3>";
+    const variableMap = new Map(variables.map((v) => [v.name, v]));
 
-    const skinOriginDiv = document.createElement("div");
-    skinOriginDiv.className = "variable-category";
-    skinOriginDiv.innerHTML = "<h3>Variables with Origin: skin</h3>";
+    categories.forEach((category) => {
+      const categoryDiv = document.createElement("div");
+      categoryDiv.className = "variable-category";
+      categoryDiv.innerHTML = `<h3>${category.name}</h3>`;
 
-    variables.forEach((variable) => {
-      const listItem = document.createElement("li");
-      listItem.textContent = `${variable.name}: ${variable.value}`;
+      const filteredVariables = variables.filter(category.filter);
 
-      if (variable.inCurrentStory) {
-        currentStoryDiv.appendChild(listItem);
-      }
+      filteredVariables.forEach((variable) => {
+        const listItem = createVariableListItem(variable, variableMap);
+        categoryDiv.appendChild(listItem);
+      });
 
-      if (variable.origin === "main") {
-        mainOriginDiv.appendChild(listItem.cloneNode(true));
-      } else if (variable.origin === "skin") {
-        skinOriginDiv.appendChild(listItem.cloneNode(true));
-      }
+      variableList.appendChild(categoryDiv);
     });
 
-    variableList.appendChild(currentStoryDiv);
-    variableList.appendChild(mainOriginDiv);
-    variableList.appendChild(skinOriginDiv);
+    // Add click event listeners to variable links
+    document.querySelectorAll(".variable-link").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const targetId = (event.currentTarget as HTMLAnchorElement)
+          .getAttribute("href")
+          ?.slice(1);
+        if (targetId) {
+          const targetElement = document.getElementById(targetId);
+          if (targetElement) {
+            targetElement.scrollIntoView({ behavior: "smooth" });
+            targetElement.classList.add("highlight");
+            setTimeout(() => targetElement.classList.remove("highlight"), 2000);
+          }
+        }
+      });
+    });
   }
+}
+
+function createVariableListItem(
+  variable: CSSVariable,
+  variableMap: Map<string, CSSVariable>
+): HTMLLIElement {
+  const listItem = document.createElement("li");
+  listItem.className = "variable-item";
+  listItem.id = `var-${variable.name.slice(2)}`; // Remove leading '--' for the id
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "variable-name";
+  nameSpan.textContent = variable.name;
+
+  const valueSpan = document.createElement("span");
+  valueSpan.className = "variable-value";
+
+  if (isColor(variable.value)) {
+    const colorPicker = document.createElement("input");
+    colorPicker.type = "color";
+    colorPicker.value = variable.value;
+    colorPicker.disabled = true;
+    valueSpan.appendChild(colorPicker);
+  }
+
+  const valueText = document.createElement("span");
+  valueText.innerHTML = createLinkedValue(variable.value, variableMap);
+  valueSpan.appendChild(valueText);
+
+  listItem.appendChild(nameSpan);
+  listItem.appendChild(valueSpan);
+
+  return listItem;
+}
+
+function createLinkedValue(
+  value: string,
+  variableMap: Map<string, CSSVariable>
+): string {
+  return value.replace(/var\((--[\w-]+)\)/g, (match, varName) => {
+    if (variableMap.has(varName)) {
+      return `<a href="#var-${varName.slice(
+        2
+      )}" class="variable-link">${match}</a>`;
+    }
+    return match;
+  });
+}
+
+function isColor(value: string): boolean {
+  // Simple check for hex colors, rgb, rgba, hsl, hsla
+  return /^(#|rgb|hsl)/.test(value);
 }
 
 console.log("Popup script loaded");

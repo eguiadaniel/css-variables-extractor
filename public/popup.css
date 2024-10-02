@@ -1,0 +1,88 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    width: 400px;
+    padding: 16px;
+  }
+  
+  .variable-category {
+    margin-bottom: 20px;
+  }
+  
+  .variable-category h3 {
+    font-size: 16px;
+    margin-bottom: 10px;
+    color: #333;
+  }
+  
+  .variable-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  
+  .variable-name {
+    flex: 0 0 50%;
+    color: #881391;
+  }
+  
+  .variable-value {
+    display: flex;
+    align-items: center;
+  }
+  
+  .variable-value input[type="color"] {
+    width: 20px;
+    height: 20px;
+    border: none;
+    margin-right: 8px;
+  }
+  
+  .variable-value span {
+    color: #1a1aa6;
+  }
+
+  /* body {
+        width: 400px;
+        padding: 10px;
+        font-family: Arial, sans-serif;
+      }
+      button {
+        margin: 5px 0;
+        display: block;
+        width: 100%;
+      }
+      #variableList {
+        margin-top: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .variable-row {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+      }
+      .variable-name {
+        font-weight: bold;
+        margin-right: 10px;
+        flex: 1;
+      }
+      input[type="text"],
+      input[type="color"] {
+        width: 100px;
+      }
+      input[type="color"] {
+        height: 30px;
+        padding: 0;
+        border: none;
+      }
+      .variable-category {
+        margin-bottom: 20px;
+      }
+      h3 {
+        margin-bottom: 10px;
+      }
+      ul {
+        list-style-type: none;
+        padding-left: 0;
+      } */
