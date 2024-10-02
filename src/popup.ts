@@ -321,10 +321,20 @@ function updateVariableValue(name: string, value: string) {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     const activeTab = tabs[0];
     if (activeTab.id) {
-      chrome.tabs.sendMessage(activeTab.id, {
-        action: "updateVariable",
-        variable: { [name]: value },
-      });
+      chrome.tabs.sendMessage(
+        activeTab.id,
+        {
+          action: "updateVariable",
+          variable: { [name]: value },
+        },
+        function (response) {
+          if (chrome.runtime.lastError) {
+            console.error(chrome.runtime.lastError);
+          } else if (response && response.currentVariables) {
+            console.log(response);
+          }
+        }
+      );
     }
   });
 }

@@ -1,4 +1,4 @@
-console.log("Script started");
+// console.log("Script started");
 
 // Inicializar variables globales
 window.extractedData = {
@@ -41,7 +41,7 @@ chrome.runtime.onMessage.addListener(
     sender: chrome.runtime.MessageSender,
     sendResponse: (response?: any) => void
   ) => {
-    console.log("Message received in content script:", request);
+    // console.log("Message received in content script:", request);
     if (request.action === "extract") {
       extractAllRelevantCSSVariables()
         .then((cssVariables) => {
@@ -52,9 +52,9 @@ chrome.runtime.onMessage.addListener(
             currentVariables[v.name] = v.value;
           });
 
-          console.log("Extracted and updated currentVariables:");
-          console.log("cssVariables", cssVariables);
-          console.log("currentVariables", currentVariables);
+          // console.log("Extracted and updated currentVariables:");
+          // console.log("cssVariables", cssVariables);
+          // console.log("currentVariables", currentVariables);
           sendResponse({ variables: cssVariables }); // Send the full array of CSSVariables
         })
         .catch((error) => {
@@ -68,7 +68,7 @@ chrome.runtime.onMessage.addListener(
       sendResponse({ success: true });
     } else if (request.action === "updateVariable") {
       updateVariable(request.variable);
-      sendResponse({ success: true });
+      sendResponse({ success: true, currentVariables: currentVariables });
     } else if (request.action === "exportVariables") {
       sendResponse({ variables: allVariables });
     }
@@ -76,7 +76,7 @@ chrome.runtime.onMessage.addListener(
 );
 
 async function extractAllRelevantCSSVariables(): Promise<CSSVariable[]> {
-  console.log("extractAllRelevantCSSVariables called");
+  // console.log("extractAllRelevantCSSVariables called");
   const iframe = document.getElementById(
     "storybook-preview-iframe"
   ) as HTMLIFrameElement | null;
@@ -153,12 +153,12 @@ async function extractAllRelevantCSSVariables(): Promise<CSSVariable[]> {
 
   const allVariables = Array.from(variableMap.values());
 
-  console.log("extractAllRelevantCSSVariables()", allVariables);
+  // console.log("extractAllRelevantCSSVariables()", allVariables);
   return allVariables;
 }
 
 function findShowcasedComponent(doc: Document): Element | null {
-  console.log("findShowcasedComponent called");
+  // console.log("findShowcasedComponent called");
   const selectors = [
     "#storybook-root > storybook-root > *:not(storybook-root)",
     "#storybook-root > *:not(storybook-root)",
@@ -170,7 +170,7 @@ function findShowcasedComponent(doc: Document): Element | null {
   for (let selector of selectors) {
     const elements = doc.querySelectorAll(selector);
     for (let element of elements) {
-      console.log("element", element);
+      // console.log("element", element);
       if (
         element.tagName.toLowerCase() !== "storybook-root" &&
         !element.tagName.toLowerCase().startsWith("ng-")
@@ -183,7 +183,7 @@ function findShowcasedComponent(doc: Document): Element | null {
   const rootChildren = doc.querySelectorAll("#storybook-root > *");
   for (let child of rootChildren) {
     if (child.tagName.toLowerCase() !== "storybook-root") {
-      console.log("child", child);
+      // console.log("child", child);
       return child;
     }
   }
@@ -246,7 +246,7 @@ function extractVariablesFromText(
   origin: string,
   relevantSelectors: string[] | null
 ): CSSVariable[] {
-  console.log(`Extracting variables from ${sourceKey}`);
+  // console.log(`Extracting variables from ${sourceKey}`);
   const variables: CSSVariable[] = [];
   const variableMap = new Map<string, CSSVariable>();
 
@@ -262,7 +262,7 @@ function extractVariablesFromText(
     return variables;
   }
 
-  console.log(`Number of CSS rules: ${styleSheet.cssRules.length}`);
+  // console.log(`Number of CSS rules: ${styleSheet.cssRules.length}`);
 
   // First pass: extract all variables
   for (let i = 0; i < styleSheet.cssRules.length; i++) {
@@ -308,7 +308,7 @@ function extractVariablesFromText(
     variables.push(variable);
   }
 
-  console.log(`Extracted ${variables.length} variables from ${sourceKey}`);
+  // console.log(`Extracted ${variables.length} variables from ${sourceKey}`);
   return variables;
 }
 
@@ -415,19 +415,20 @@ function applyVariablesToElementAndChildren(
 
 function updateVariable(variable: { [key: string]: string }): void {
   Object.assign(currentVariables, variable);
+  // console.log("updateVariable --> currentVariables", currentVariables);
   applyCSSVariablesToShowcasedComponent(variable);
 }
 
 extractAllRelevantCSSVariables()
   .then((cssVariables) => {
-    console.log("Initial extraction complete:", cssVariables);
+    // console.log("Initial extraction complete:", cssVariables);
     currentVariables = {};
     cssVariables.forEach((v) => (currentVariables[v.name] = v.value));
-    console.log("Extracted and updated currentVariables:", currentVariables);
+    // console.log("Extracted and updated currentVariables:", currentVariables);
   })
   .catch((error) => {
     console.error("Error extracting CSS variables:", error);
   });
 
 // At the end of the file, add:
-console.log("Content script loaded. Current variables:", currentVariables);
+// console.log("Content script loaded. Current variables:", currentVariables);
