@@ -35,9 +35,9 @@ chrome.runtime.onMessage.addListener(
       sendResponse({ success: true });
     } else if (request.action === "updateVariable") {
       console.log("Received updateVariable request:", request.variable);
-      updateVariable(request.variable);
-      sendResponse({ success: true, updatedVariables: currentVariables });
-      console.log("Current variables after update:", currentVariables);
+      const updatedVariables = updateVariable(request.variable);
+      sendResponse({ success: true, updatedVariables: updatedVariables });
+      console.log("Current variables after update:", updatedVariables);
     } else if (request.action === "exportVariables") {
       sendResponse({ variables: currentVariables });
     }
@@ -423,12 +423,12 @@ function applyVariablesToElementAndChildren(
   }
 }
 
-function updateVariable(updatedVariable: { [key: string]: string }): void {
+function updateVariable(updatedVariable: { [key: string]: string }): CSSVariable[] | null {
   console.log("Updating variable:", updatedVariable);
 
   if (!updatedVariable || typeof updatedVariable !== "object") {
     console.error("Invalid updatedVariable:", updatedVariable);
-    return;
+    return null; // Return current variables without changes
   }
 
   const entries = Object.entries(updatedVariable);
@@ -437,34 +437,38 @@ function updateVariable(updatedVariable: { [key: string]: string }): void {
       "Expected exactly one key-value pair in updatedVariable:",
       updatedVariable
     );
-    return;
+    return null; // Return current variables without changes
   }
 
   const [name, value] = entries[0];
 
   console.log("Current variables before update:", currentVariables);
 
-  const variablesToUpdate = currentVariables.filter((v) => v.name === name);
+  // Update the target variable
+  const variableToUpdate = currentVariables.find((v) => v.name === name);
+  if (variableToUpdate) {
+    variableToUpdate.value = value;
+    variableToUpdate.resolvedValue = value;
+    variableToUpdate.alias = null;
+    variableToUpdate.aliasOrigin = null;
 
-  if (variablesToUpdate.length > 0) {
-    variablesToUpdate.forEach((variable) => {
-      console.log(`Updating variable: ${variable.name}`);
-      variable.value = value;
-      variable.resolvedValue = value;
-      variable.alias = null;
-      variable.aliasOrigin = null;
+    // Update all variables that depend on the updated variable
+    currentVariables.forEach((v) => {
+      if (v.alias === name || v.aliasOrigin === name) {
+        v.resolvedValue = value;
+        v.alias = name;
+        v.aliasOrigin = name;
+      }
     });
-    applyCSSVariablesToShowcasedComponent(variablesToUpdate);
+
+    applyCSSVariablesToShowcasedComponent(currentVariables);
     console.log("Variables updated successfully");
   } else {
     console.error(`Variable ${name} not found in currentVariables`);
-    console.log(
-      "All current variable names:",
-      currentVariables.map((v) => v.name)
-    );
   }
 
   console.log("Current variables after update:", currentVariables);
+  return currentVariables;
 }
 
 console.log("Content script loaded. Current variables:", currentVariables);

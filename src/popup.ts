@@ -317,7 +317,6 @@ function hexToRgb(hex: string): string {
 }
 
 function updateVariableValue(name: string, value: string) {
-  // Send message to content script to update the variable
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     const activeTab = tabs[0];
     if (activeTab.id) {
@@ -325,13 +324,14 @@ function updateVariableValue(name: string, value: string) {
         activeTab.id,
         {
           action: "updateVariable",
-          variable: { [name]: value }, // This creates an object with a single key-value pair
+          variable: { [name]: value },
         },
         function (response) {
           if (chrome.runtime.lastError) {
             console.error(chrome.runtime.lastError);
-          } else if (response && response.currentVariables) {
-            console.log(response);
+          } else if (response && response.updatedVariables) {
+            // Regenerate the entire variable list with the updated variables
+            updateVariableList(response.updatedVariables);
           }
         }
       );
