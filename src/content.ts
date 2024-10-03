@@ -1,19 +1,3 @@
-// console.log("Script started");
-
-// Inicializar variables globales
-window.extractedData = {
-  mainCss: { info: {}, variables: [] },
-  defaultCss: { info: {}, variables: [] },
-  currentStory: { info: {}, variables: [] },
-};
-window.currentVariables = {};
-
-interface ExtractedData {
-  mainCss: { info: {}; variables: CSSVariable[] };
-  defaultCss: { info: {}; variables: CSSVariable[] };
-  currentStory: { info: {}; variables: CSSVariable[] };
-}
-
 interface CSSVariable {
   id: string;
   name: string;
@@ -25,12 +9,6 @@ interface CSSVariable {
   origin: string;
   inCurrentStory: boolean;
 }
-
-let extractedData: ExtractedData = {
-  mainCss: { info: {}, variables: [] },
-  defaultCss: { info: {}, variables: [] },
-  currentStory: { info: {}, variables: [] },
-};
 
 let currentVariables: CSSVariable[] = [];
 
@@ -45,7 +23,6 @@ chrome.runtime.onMessage.addListener(
       extractAllRelevantCSSVariables()
         .then((cssVariables) => {
           currentVariables = cssVariables;
-          applyCSSVariablesToShowcasedComponent(currentVariables);
           sendResponse({ variables: currentVariables });
         })
         .catch((error) => {
@@ -55,14 +32,12 @@ chrome.runtime.onMessage.addListener(
       return true; // Indicates we wish to send a response asynchronously
     } else if (request.action === "import") {
       currentVariables = request.variables;
-      applyCSSVariablesToShowcasedComponent(currentVariables);
       sendResponse({ success: true });
     } else if (request.action === "updateVariable") {
       console.log("Received updateVariable request:", request.variable);
       updateVariable(request.variable);
-
-      console.log("Current variables after update:", currentVariables);
       sendResponse({ success: true, updatedVariables: currentVariables });
+      console.log("Current variables after update:", currentVariables);
     } else if (request.action === "exportVariables") {
       sendResponse({ variables: currentVariables });
     }
@@ -369,6 +344,11 @@ function applyCSSVariablesToShowcasedComponent(
     // Create a map to store all variables and their aliases
     const variableMap = new Map<string, string>();
 
+    // const modifiedVariables = variablesToApply.filter((variable) => {
+    //   const currentVar = currentVariables.find((v) => v.name === variable.name);
+    //   return currentVar && currentVar.value !== variable.value;
+    // });
+
     // First pass: collect all variables and their values
     variablesToApply.forEach((variable) => {
       variableMap.set(variable.name, variable.value);
@@ -489,15 +469,5 @@ function updateVariable(updatedVariable: { [key: string]: string }): void {
   console.log("Current variables after update:", currentVariables);
 }
 
-// exportCurrentVariables()
-//   .then((cssVariables) => {
-//     // console.log("Initial extraction complete:", cssVariables);
-//     currentVariables = {};
-//     cssVariables.forEach((v) => (currentVariables[v.name] = v.value));
-//     // console.log("Extracted and updated currentVariables:", currentVariables);
-//   })
-//   .catch((error) => {
-//     console.error("Error extracting CSS variables:", error);
-//   });
 
 console.log("Content script loaded. Current variables:", currentVariables);
