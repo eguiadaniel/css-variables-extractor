@@ -444,9 +444,7 @@ function updateVariable(updatedVariable: { [key: string]: string }): void {
 
   console.log("Current variables before update:", currentVariables);
 
-  const variablesToUpdate = currentVariables.filter(
-    (v) => v.name === name || v.alias === name || v.aliasOrigin === name
-  );
+  const variablesToUpdate = currentVariables.filter((v) => v.name === name);
 
   if (variablesToUpdate.length > 0) {
     variablesToUpdate.forEach((variable) => {
@@ -468,6 +466,5 @@ function updateVariable(updatedVariable: { [key: string]: string }): void {
 
   console.log("Current variables after update:", currentVariables);
 }
-
 
 console.log("Content script loaded. Current variables:", currentVariables);
