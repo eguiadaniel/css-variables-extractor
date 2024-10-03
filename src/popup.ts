@@ -325,7 +325,7 @@ function updateVariableValue(name: string, value: string) {
         activeTab.id,
         {
           action: "updateVariable",
-          variable: { [name]: value },
+          variable: { [name]: value }, // This creates an object with a single key-value pair
         },
         function (response) {
           if (chrome.runtime.lastError) {
