@@ -37,6 +37,7 @@ body {
   display: flex;
   align-items: center;
   margin-right: 10px;
+  flex: 1 0 auto;
 }
 
 .variable-value input[type="color"] {
@@ -49,6 +50,7 @@ body {
 .variable-value input[type="text"] {
   width: 100px;
   padding: 0;
+  width: 100%;
 }
 
 .variable-alias,

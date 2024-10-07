@@ -221,43 +221,34 @@ function createVariableListItem(
   if (isColor(variable.resolvedValue)) {
     const colorPicker = document.createElement("input");
     colorPicker.type = "color";
-    colorPicker.value = rgbToHex(variable.resolvedValue);
+    colorPicker.value = variable.resolvedValue;
     valueSpan.appendChild(colorPicker);
 
     const colorText = document.createElement("input");
     colorText.type = "text";
-    colorText.value = variable.resolvedValue;
+    colorText.value = variable.alias ? variable.alias : variable.resolvedValue;
     colorText.className = "color-text";
     valueSpan.appendChild(colorText);
 
-    // Updated event listener for color picker
+    // Event listener for color picker
     colorPicker.addEventListener("change", (event) => {
       const newColor = (event.target as HTMLInputElement).value;
-      colorText.value = hexToRgb(newColor);
-      updateVariableValue(variable.name, hexToRgb(newColor));
+      colorText.value = newColor;
+      updateVariableValue(variable.name, newColor);
     });
 
-    // Updated event listener for text input
+    // Event listener for text input
     colorText.addEventListener("change", (event) => {
       const newColor = (event.target as HTMLInputElement).value;
       if (isColor(newColor)) {
-        colorPicker.value = rgbToHex(newColor);
+        colorPicker.value = newColor;
         updateVariableValue(variable.name, newColor);
-      }
-    });
-
-    // Optional: Add an "input" event listener for real-time preview
-    colorText.addEventListener("input", (event) => {
-      const newColor = (event.target as HTMLInputElement).value;
-      if (isColor(newColor)) {
-        colorPicker.value = rgbToHex(newColor);
-        // Note: We don't call updateVariableValue here
       }
     });
   } else {
     const textInput = document.createElement("input");
     textInput.type = "text";
-    textInput.value = variable.resolvedValue;
+    textInput.value = variable.alias ? variable.alias : variable.resolvedValue;
     textInput.className = "text-input";
     valueSpan.appendChild(textInput);
 
@@ -273,6 +264,7 @@ function createVariableListItem(
   const aliasContainer = document.createElement("div");
   aliasContainer.style.display = "flex";
   aliasContainer.style.flexDirection = "column";
+  aliasContainer.style.flex = "0 0 auto";
 
   const aliasSpan = document.createElement("span");
   aliasSpan.className = "variable-alias";
@@ -302,30 +294,6 @@ function isColor(value: string): boolean {
   return /^(#|rgb|rgba|hsl|hsla)/.test(value);
 }
 
-function rgbToHex(rgb: string): string {
-  // Convert rgb(r, g, b) to #rrggbb
-  const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
-  if (match) {
-    return (
-      "#" +
-      match
-        .slice(1)
-        .map((n) => parseInt(n, 10).toString(16).padStart(2, "0"))
-        .join("")
-    );
-  }
-  return rgb;
-}
-
-function hexToRgb(hex: string): string {
-  // Convert #rrggbb to rgb(r, g, b)
-  const bigint = parseInt(hex.slice(1), 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 function updateVariableValue(name: string, value: string) {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     const activeTab = tabs[0];
@@ -339,8 +307,8 @@ function updateVariableValue(name: string, value: string) {
         function (response) {
           if (chrome.runtime.lastError) {
             console.error(chrome.runtime.lastError);
-          } else if (response && response.updatedVariable) {
-            // Update only the changed variable in the list
+          } else if (response && response.updatedVariables) {
+            // Update the entire variable list with the new data
             updateSingleVariableInList(response.updatedVariable);
           }
         }
@@ -348,21 +316,29 @@ function updateVariableValue(name: string, value: string) {
     }
   });
 }
-
 function updateSingleVariableInList(updatedVariable: CSSVariable) {
-  const variableElement = document.getElementById(`var-${updatedVariable.name.slice(2)}`);
+  const variableElement = document.getElementById(
+    `var-${updatedVariable.name.slice(2)}`
+  );
   if (variableElement) {
-    const valueSpan = variableElement.querySelector('.variable-value');
+    const valueSpan = variableElement.querySelector(".variable-value");
     if (valueSpan) {
       if (isColor(updatedVariable.resolvedValue)) {
-        const colorPicker = valueSpan.querySelector('input[type="color"]') as HTMLInputElement;
-        const colorText = valueSpan.querySelector('.color-text') as HTMLInputElement;
+        const colorPicker = valueSpan.querySelector(
+          'input[type="color"]'
+        ) as HTMLInputElement;
+        const colorText = valueSpan.querySelector(
+          ".color-text"
+        ) as HTMLInputElement;
         if (colorPicker && colorText) {
-          colorPicker.value = rgbToHex(updatedVariable.resolvedValue);
+          // Use the resolvedValue directly for both color picker and text input
+          colorPicker.value = updatedVariable.resolvedValue;
           colorText.value = updatedVariable.resolvedValue;
         }
       } else {
-        const textInput = valueSpan.querySelector('.text-input') as HTMLInputElement;
+        const textInput = valueSpan.querySelector(
+          ".text-input"
+        ) as HTMLInputElement;
         if (textInput) {
           textInput.value = updatedVariable.resolvedValue;
         }
@@ -370,17 +346,25 @@ function updateSingleVariableInList(updatedVariable: CSSVariable) {
     }
 
     // Update alias and aliasOrigin if necessary
-    const aliasSpan = variableElement.querySelector('.variable-alias');
-    const aliasOriginSpan = variableElement.querySelector('.variable-alias-origin');
+    const aliasSpan = variableElement.querySelector(".variable-alias");
+    const aliasOriginSpan = variableElement.querySelector(
+      ".variable-alias-origin"
+    );
     if (aliasSpan) {
       aliasSpan.innerHTML = updatedVariable.alias
-        ? `Alias: <a href="#var-${updatedVariable.alias.slice(2)}" class="variable-link">${updatedVariable.alias}</a>`
-        : '';
+        ? `Alias: <a href="#var-${updatedVariable.alias.slice(
+            2
+          )}" class="variable-link">${updatedVariable.alias}</a>`
+        : "";
     }
     if (aliasOriginSpan) {
-      aliasOriginSpan.innerHTML = updatedVariable.aliasOrigin && updatedVariable.aliasOrigin !== updatedVariable.alias
-        ? `Origin: <a href="#var-${updatedVariable.aliasOrigin.slice(2)}" class="variable-link">${updatedVariable.aliasOrigin}</a>`
-        : '';
+      aliasOriginSpan.innerHTML =
+        updatedVariable.aliasOrigin &&
+        updatedVariable.aliasOrigin !== updatedVariable.alias
+          ? `Origin: <a href="#var-${updatedVariable.aliasOrigin.slice(
+              2
+            )}" class="variable-link">${updatedVariable.aliasOrigin}</a>`
+          : "";
     }
   }
 }
