@@ -92,7 +92,8 @@ function importVariables(event: Event) {
       const content = e.target?.result;
       if (typeof content === "string") {
         try {
-          const variables = JSON.parse(content);
+          const importedVariables = JSON.parse(content);
+          // Extraer las variables actuales antes de la comparación
           chrome.tabs.query(
             { active: true, currentWindow: true },
             function (tabs) {
@@ -100,12 +101,38 @@ function importVariables(event: Event) {
               if (activeTab.id) {
                 chrome.tabs.sendMessage(
                   activeTab.id,
-                  { action: "import", variables: variables },
+                  { action: "extract" },
                   function (response) {
                     if (chrome.runtime.lastError) {
                       console.error(chrome.runtime.lastError);
-                    } else if (response && response.success) {
-                      updateVariableList(variables);
+                    } else if (response && response.variables) {
+                      // Comparar variables actuales con importadas
+                      const updatedVariables = findUpdatedVariables(
+                        response.variables,
+                        importedVariables
+                      );
+
+                      console.log("updatedVariables: ", updatedVariables);
+
+                      // Enviar solo las variables actualizadas
+                      if (activeTab.id) {
+                        chrome.tabs.sendMessage(
+                          activeTab.id,
+                          {
+                            // wrong caller, but "updateVariables" does no admin CSSVariable[]type, just [key: string]: string
+                            action: "applyUpdatedVariables",
+                            variables: updatedVariables,
+                          },
+                          function (applyResponse) {
+                            if (chrome.runtime.lastError) {
+                              console.error(chrome.runtime.lastError);
+                            } else if (applyResponse && applyResponse.success) {
+                              console.log("Variables applied successfully");
+                              updateVariableList(updatedVariables);
+                            }
+                          }
+                        );
+                      }
                     }
                   }
                 );
@@ -119,6 +146,24 @@ function importVariables(event: Event) {
     };
     reader.readAsText(file);
   }
+}
+
+// Función para comparar variables y devolver solo las actualizadas
+function findUpdatedVariables(
+  currentVariables: CSSVariable[],
+  importedVariables: CSSVariable[]
+): CSSVariable[] {
+  const updatedVariables: CSSVariable[] = [];
+  const currentVariableMap = new Map(currentVariables.map((v) => [v.name, v]));
+
+  importedVariables.forEach((importedVar) => {
+    const currentVar = currentVariableMap.get(importedVar.name);
+    if (!currentVar || currentVar.resolvedValue !== importedVar.resolvedValue) {
+      updatedVariables.push(importedVar);
+    }
+  });
+
+  return updatedVariables;
 }
 
 function loadAndDisplayVariables() {
