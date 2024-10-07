@@ -230,18 +230,28 @@ function createVariableListItem(
     colorText.className = "color-text";
     valueSpan.appendChild(colorText);
 
-    // Add event listeners for color picker and text input
-    colorPicker.addEventListener("input", (event) => {
+    // Updated event listener for color picker
+    colorPicker.addEventListener("change", (event) => {
       const newColor = (event.target as HTMLInputElement).value;
       colorText.value = hexToRgb(newColor);
       updateVariableValue(variable.name, hexToRgb(newColor));
     });
 
-    colorText.addEventListener("input", (event) => {
+    // Updated event listener for text input
+    colorText.addEventListener("change", (event) => {
       const newColor = (event.target as HTMLInputElement).value;
       if (isColor(newColor)) {
         colorPicker.value = rgbToHex(newColor);
         updateVariableValue(variable.name, newColor);
+      }
+    });
+
+    // Optional: Add an "input" event listener for real-time preview
+    colorText.addEventListener("input", (event) => {
+      const newColor = (event.target as HTMLInputElement).value;
+      if (isColor(newColor)) {
+        colorPicker.value = rgbToHex(newColor);
+        // Note: We don't call updateVariableValue here
       }
     });
   } else {
