@@ -339,14 +339,50 @@ function updateVariableValue(name: string, value: string) {
         function (response) {
           if (chrome.runtime.lastError) {
             console.error(chrome.runtime.lastError);
-          } else if (response && response.updatedVariables) {
-            // Regenerate the entire variable list with the updated variables
-            updateVariableList(response.updatedVariables);
+          } else if (response && response.updatedVariable) {
+            // Update only the changed variable in the list
+            updateSingleVariableInList(response.updatedVariable);
           }
         }
       );
     }
   });
+}
+
+function updateSingleVariableInList(updatedVariable: CSSVariable) {
+  const variableElement = document.getElementById(`var-${updatedVariable.name.slice(2)}`);
+  if (variableElement) {
+    const valueSpan = variableElement.querySelector('.variable-value');
+    if (valueSpan) {
+      if (isColor(updatedVariable.resolvedValue)) {
+        const colorPicker = valueSpan.querySelector('input[type="color"]') as HTMLInputElement;
+        const colorText = valueSpan.querySelector('.color-text') as HTMLInputElement;
+        if (colorPicker && colorText) {
+          colorPicker.value = rgbToHex(updatedVariable.resolvedValue);
+          colorText.value = updatedVariable.resolvedValue;
+        }
+      } else {
+        const textInput = valueSpan.querySelector('.text-input') as HTMLInputElement;
+        if (textInput) {
+          textInput.value = updatedVariable.resolvedValue;
+        }
+      }
+    }
+
+    // Update alias and aliasOrigin if necessary
+    const aliasSpan = variableElement.querySelector('.variable-alias');
+    const aliasOriginSpan = variableElement.querySelector('.variable-alias-origin');
+    if (aliasSpan) {
+      aliasSpan.innerHTML = updatedVariable.alias
+        ? `Alias: <a href="#var-${updatedVariable.alias.slice(2)}" class="variable-link">${updatedVariable.alias}</a>`
+        : '';
+    }
+    if (aliasOriginSpan) {
+      aliasOriginSpan.innerHTML = updatedVariable.aliasOrigin && updatedVariable.aliasOrigin !== updatedVariable.alias
+        ? `Origin: <a href="#var-${updatedVariable.aliasOrigin.slice(2)}" class="variable-link">${updatedVariable.aliasOrigin}</a>`
+        : '';
+    }
+  }
 }
 
 console.log("Popup script loaded");

@@ -316,7 +316,7 @@ function ruleMatchesSelectors(
 let currentCSSVariables: { [key: string]: string } = {};
 
 function applyCSSVariablesToShowcasedComponent(
-  variables: CSSVariable | CSSVariable[]
+  variables: CSSVariable | CSSVariable[] | { [key: string]: string }
 ): void {
   const iframe = document.getElementById(
     "storybook-preview-iframe"
@@ -339,38 +339,24 @@ function applyCSSVariablesToShowcasedComponent(
       return;
     }
 
-    const variablesToApply = Array.isArray(variables) ? variables : [variables];
+    let variablePairs: [string, string][];
 
-    // Create a map to store all variables and their aliases
-    const variableMap = new Map<string, string>();
+    if (Array.isArray(variables)) {
+      variablePairs = variables.map((v) => [v.name, v.value]);
+    } else if (
+      variables instanceof Object &&
+      !(variables as CSSVariable).name
+    ) {
+      variablePairs = Object.entries(variables);
+    } else {
+      variablePairs = [[variables.name, variables.value]];
+    }
 
-    // const modifiedVariables = variablesToApply.filter((variable) => {
-    //   const currentVar = currentVariables.find((v) => v.name === variable.name);
-    //   return currentVar && currentVar.value !== variable.value;
-    // });
-
-    // First pass: collect all variables and their values
-    variablesToApply.forEach((variable) => {
-      variableMap.set(variable.name, variable.value);
-      if (variable.alias) {
-        variableMap.set(variable.alias, variable.value);
-      }
-    });
-
-    // Second pass: resolve aliases and apply variables
-    variableMap.forEach((value, name) => {
-      if (value.startsWith("var(")) {
-        const aliasName = value.match(/var\((.*?)\)/)?.[1];
-        if (aliasName && variableMap.has(aliasName)) {
-          value = variableMap.get(aliasName) || value;
-        }
-      }
-      (showcasedComponent as HTMLElement).style.setProperty(name, value);
-    });
-
-    // Aplicar inline style a todos los hijos porque desde la lista de variables, no sabemos a que elementos se le aplica.
-
-    applyVariablesToElementAndChildren(showcasedComponent, variablesToApply);
+    // Apply variables to the showcased component and its children
+    applyVariablesToElementAndChildren(
+      showcasedComponent,
+      Object.fromEntries(variablePairs)
+    );
 
     // Update or create the style element
     let styleElement = iframeDocument.head.querySelector(
@@ -384,17 +370,14 @@ function applyCSSVariablesToShowcasedComponent(
 
     // Update the content of the style element
     let css = ":root {\n";
-    variableMap.forEach((value, name) => {
+    variablePairs.forEach(([name, value]) => {
       css += `  ${name}: ${value} !important;\n`;
     });
     css += "}";
 
     styleElement.textContent = css;
 
-    console.log("Applied CSS variables:");
-    variableMap.forEach((value, name) => {
-      console.log(`  ${name}: ${value}`);
-    });
+    console.log("Applied CSS variables:", Object.fromEntries(variablePairs));
   } catch (e) {
     console.error("Error applying CSS variables:", e);
   }
@@ -402,19 +385,9 @@ function applyCSSVariablesToShowcasedComponent(
 
 function applyVariablesToElementAndChildren(
   element: Element,
-  variables: CSSVariable[] | { [key: string]: string }
+  variables: { [key: string]: string }
 ): void {
-  let variablePairs: [string, string][];
-
-  if (Array.isArray(variables)) {
-    // If it's an array of CSSVariable objects
-    variablePairs = variables.map((v) => [v.name, v.value]);
-  } else {
-    // If it's an object with a single key-value pair
-    variablePairs = Object.entries(variables);
-  }
-
-  for (const [name, value] of variablePairs) {
+  for (const [name, value] of Object.entries(variables)) {
     (element as HTMLElement).style.setProperty(name, value);
   }
 
@@ -423,12 +396,14 @@ function applyVariablesToElementAndChildren(
   }
 }
 
-function updateVariable(updatedVariable: { [key: string]: string }): CSSVariable[] | null {
+function updateVariable(updatedVariable: {
+  [key: string]: string;
+}): CSSVariable | null {
   console.log("Updating variable:", updatedVariable);
 
   if (!updatedVariable || typeof updatedVariable !== "object") {
     console.error("Invalid updatedVariable:", updatedVariable);
-    return null; // Return current variables without changes
+    return null;
   }
 
   const entries = Object.entries(updatedVariable);
@@ -437,14 +412,12 @@ function updateVariable(updatedVariable: { [key: string]: string }): CSSVariable
       "Expected exactly one key-value pair in updatedVariable:",
       updatedVariable
     );
-    return null; // Return current variables without changes
+    return null;
   }
 
   const [name, value] = entries[0];
+  console.log("---------------entries", entries);
 
-  console.log("Current variables before update:", currentVariables);
-
-  // Update the target variable
   const variableToUpdate = currentVariables.find((v) => v.name === name);
   if (variableToUpdate) {
     variableToUpdate.value = value;
@@ -461,14 +434,13 @@ function updateVariable(updatedVariable: { [key: string]: string }): CSSVariable
       }
     });
 
-    applyCSSVariablesToShowcasedComponent(currentVariables);
-    console.log("Variables updated successfully");
+    applyCSSVariablesToShowcasedComponent({ [name]: value });
+    console.log("Variable updated successfully:", variableToUpdate);
+    return variableToUpdate;
   } else {
     console.error(`Variable ${name} not found in currentVariables`);
+    return null;
   }
-
-  console.log("Current variables after update:", currentVariables);
-  return currentVariables;
 }
 
 console.log("Content script loaded. Current variables:", currentVariables);
